@@ -38,4 +38,3 @@ yarn-error.*
 
 # EAS
 eas-*.log
-bun.lock
