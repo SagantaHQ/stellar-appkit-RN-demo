@@ -9,6 +9,7 @@
  * safely after this module has evaluated.
  */
 import './src/polyfills';
+import 'react-native-gesture-handler';
 
 import { registerRootComponent } from 'expo';
 

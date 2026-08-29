@@ -1,0 +1,4 @@
+<resources>
+  <string name="app_name">Stellar AppKit RN Demo</string>
+  <string name="expo_runtime_version">exposdk:57.0.0</string>
+</resources>
