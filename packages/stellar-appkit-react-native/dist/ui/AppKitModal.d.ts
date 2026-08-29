@@ -1,6 +1,19 @@
 /**
  * AppKitModal — the React Native modal UI for Stellar AppKit.
  *
+ * This file is the orchestrator only: it owns the view state machine
+ * (list → connecting → account / error), the connect actions and the
+ * deep-link handoff, and the @gorhom/bottom-sheet shell. Every screen is
+ * its own file under ./views/ for easy management:
+ *
+ *   views/WalletListView.tsx   — wallet picker (web-parity flat rows)
+ *   views/WalletRowView.tsx    — one wallet row (.wallet-row port)
+ *   views/ConnectingView.tsx   — connecting / signing (+ animations)
+ *   views/AccountView.tsx      — connected account
+ *   views/ErrorView.tsx        — failure + retry
+ *
+ * Shared types live in ./types.ts, the design system in ./styles.ts.
+ *
  * Feature parity with the web `<stellar-appkit-modal>` adapted to native
  * idioms (per ARCHITECTURE.md's RN plan):
  *

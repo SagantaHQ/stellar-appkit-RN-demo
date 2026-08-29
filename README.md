@@ -58,12 +58,14 @@ which requires a project id:
 
 ## What the demo exercises
 
-- **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with a sectioned wallet list:
-  the featured Stellar wallets (tap Freighter / LOBSTR / HOT Wallet / Scopuly → deep link
-  `freighterwallet://wc?uri=…` etc., with universal-link and store fallbacks) plus every other
-  WalletConnect-registered mobile wallet under a collapsible "More wallets" section, and the
-  Albedo WebView screen. Pairing is deep-link only — on a phone the same device would have to
-  scan a QR code, so the modal never shows one. The connecting and account views carry
+- **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with a web-parity wallet list
+  (flat rounded rows, 40dp squircle tiles with drop shadow, "Installed" outline badges, accent
+  Install pills): the featured Stellar wallets (tap Freighter / LOBSTR / HOT Wallet / Scopuly →
+  deep link `freighterwallet://wc?uri=…` etc., with universal-link and store fallbacks) plus
+  every other WalletConnect-registered mobile wallet under a collapsible "More wallets"
+  section, and the Albedo WebView screen. Pairing is deep-link only — on a phone the same
+  device would have to scan a QR code, so the modal never shows one. The connecting and
+  account views carry
   the wallet's own name and icon (WalletConnect peer metadata), never a generic label.
 - **Session** — address, wallet identity, live TESTNET balance from Horizon,
   `AsyncStorage`-backed persistence (sessions survive app restarts).

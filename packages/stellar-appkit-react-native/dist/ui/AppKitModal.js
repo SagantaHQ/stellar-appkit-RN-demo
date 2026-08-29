@@ -2,6 +2,19 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 /**
  * AppKitModal — the React Native modal UI for Stellar AppKit.
  *
+ * This file is the orchestrator only: it owns the view state machine
+ * (list → connecting → account / error), the connect actions and the
+ * deep-link handoff, and the @gorhom/bottom-sheet shell. Every screen is
+ * its own file under ./views/ for easy management:
+ *
+ *   views/WalletListView.tsx   — wallet picker (web-parity flat rows)
+ *   views/WalletRowView.tsx    — one wallet row (.wallet-row port)
+ *   views/ConnectingView.tsx   — connecting / signing (+ animations)
+ *   views/AccountView.tsx      — connected account
+ *   views/ErrorView.tsx        — failure + retry
+ *
+ * Shared types live in ./types.ts, the design system in ./styles.ts.
+ *
  * Feature parity with the web `<stellar-appkit-modal>` adapted to native
  * idioms (per ARCHITECTURE.md's RN plan):
  *
@@ -33,19 +46,19 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * Presentation: @gorhom/bottom-sheet with a backdrop, swipe-to-dismiss.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Linking, Platform, Pressable, Share, StyleSheet, Text, View, } from 'react-native';
+import { Linking, Platform, Pressable, Share, Text, View } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { t } from '@saganta/stellar-appkit';
-import { buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, getMobileWallet, listAdditionalMobileWallets, listFeaturedMobileWallets, } from '../deep-links.js';
+import { buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, getMobileWallet, } from '../deep-links.js';
 import { useAppKit } from './useAppKit.js';
-import { useBreathe, useReducedMotion, useSpinner } from './animations.js';
-import { WalletIcon } from './WalletIcon.js';
+import { useReducedMotion } from './animations.js';
+import { buildStyles } from './styles.js';
+import { VIEW_TITLES } from './types.js';
 import { defaultTheme } from './theme.js';
-const VIEW_TITLES = {
-    list: 'title.connect_wallet',
-    account: 'title.account',
-    error: 'error.title',
-};
+import { WalletListView } from './views/WalletListView.js';
+import { ConnectingView } from './views/ConnectingView.js';
+import { AccountView } from './views/AccountView.js';
+import { ErrorView } from './views/ErrorView.js';
 export function AppKitModal({ client, open, onClose, theme = defaultTheme }) {
     const state = useAppKit(client);
     const reducedMotion = useReducedMotion();
@@ -228,7 +241,7 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme }) {
     if (!open)
         return null;
     const titleKey = VIEW_TITLES[view];
-    return (_jsxs(BottomSheet, { ref: sheetRef, index: 0, snapPoints: ['82%'], enablePanDownToClose: true, onClose: onClose, backdropComponent: (props) => (_jsx(BottomSheetBackdrop, { ...props, disappearsOnIndex: -1, appearsOnIndex: 0, pressBehavior: "close", opacity: 0.6 })), backgroundStyle: { backgroundColor: theme.colorBg, borderTopLeftRadius: theme.radiusLg, borderTopRightRadius: theme.radiusLg }, handleIndicatorStyle: { backgroundColor: theme.colorTextMuted }, children: [_jsxs(View, { style: styles.header, children: [_jsx(View, { style: styles.headerButtonSpacer }), titleKey ? _jsx(Text, { style: styles.headerTitle, children: t(titleKey) }) : _jsx(View, {}), _jsx(Pressable, { style: ({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed], onPress: onClose, accessibilityRole: "button", accessibilityLabel: t('aria.close_dialog'), hitSlop: 8, children: _jsx(Text, { style: styles.headerButtonGlyph, children: "\u00D7" }) })] }), _jsxs(BottomSheetScrollView, { contentContainerStyle: styles.content, children: [view === 'list' && (_jsx(WalletListView, { styles: styles, theme: theme, loading: loadingWallets, rows: walletRows, showMobileWallets: Boolean(wcConnector), showMore: showMoreWallets, onToggleMore: () => setShowMoreWallets((v) => !v), onConnectMobile: connectMobileWallet, onConnectConnector: connectConnector, onInstall: (row) => {
+    return (_jsxs(BottomSheet, { ref: sheetRef, index: 0, snapPoints: ['82%'], enablePanDownToClose: true, onClose: onClose, backdropComponent: (props) => (_jsx(BottomSheetBackdrop, { ...props, disappearsOnIndex: -1, appearsOnIndex: 0, pressBehavior: "close", opacity: 0.6 })), backgroundStyle: { backgroundColor: theme.colorSurface, borderTopLeftRadius: theme.radiusLg, borderTopRightRadius: theme.radiusLg }, handleIndicatorStyle: { backgroundColor: theme.colorTextMuted }, children: [_jsxs(View, { style: styles.header, children: [_jsx(View, { style: styles.headerButtonSpacer }), titleKey ? _jsx(Text, { style: styles.headerTitle, children: t(titleKey) }) : _jsx(View, {}), _jsx(Pressable, { style: ({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed], onPress: onClose, accessibilityRole: "button", accessibilityLabel: t('aria.close_dialog'), hitSlop: 8, children: _jsx(Text, { style: styles.headerButtonGlyph, children: "\u00D7" }) })] }), _jsxs(BottomSheetScrollView, { contentContainerStyle: styles.content, children: [view === 'list' && (_jsx(WalletListView, { styles: styles, theme: theme, loading: loadingWallets, rows: walletRows, showMobileWallets: Boolean(wcConnector), showMore: showMoreWallets, onToggleMore: () => setShowMoreWallets((v) => !v), onConnectMobile: connectMobileWallet, onConnectConnector: connectConnector, onInstall: (row) => {
                             const url = Platform.select({
                                 ios: row.connector.meta.installUrl?.ios,
                                 android: row.connector.meta.installUrl?.android,
@@ -254,226 +267,5 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme }) {
                             setView('list');
                             void refreshWallets();
                         } }))] })] }));
-}
-// ---------------------------------------------------------------------------
-// Wallet list — featured Stellar wallets + connectors in a card, every other
-// WC-registered mobile wallet collapsed under "More wallets"
-// ---------------------------------------------------------------------------
-function WalletListView(props) {
-    const { styles, theme, loading, rows, showMobileWallets, showMore, onToggleMore, onConnectMobile, onConnectConnector, onInstall, } = props;
-    const featured = showMobileWallets ? listFeaturedMobileWallets() : [];
-    const additional = showMobileWallets ? listAdditionalMobileWallets() : [];
-    // The WalletConnect connector has no row of its own — the named mobile
-    // wallets above ARE its pairing surface (deep link only, no QR).
-    const directRows = rows.filter((row) => row.connector.id !== 'walletconnect');
-    if (loading && rows.length === 0) {
-        return (_jsxs(View, { style: styles.centered, children: [_jsx(ActivityIndicator, { color: theme.colorAccent }), _jsx(Text, { style: styles.muted, children: t('wallet_list.loading') })] }));
-    }
-    const hasPrimarySection = featured.length > 0 || directRows.length > 0;
-    return (_jsxs(View, { style: styles.sections, children: [hasPrimarySection && (_jsxs(View, { children: [_jsx(Text, { style: styles.sectionTitle, accessibilityRole: "header", children: t('wallet_list.section_stellar') }), _jsxs(View, { style: styles.sectionCard, children: [featured.map((wallet, i) => (_jsx(WalletRowView, { styles: styles, theme: theme, icon: wallet.icon, walletKey: wallet.id, name: wallet.name, subtitle: t('wc.open_in_wallet'), onPress: () => onConnectMobile(wallet), last: i === featured.length - 1 && directRows.length === 0 }, wallet.id))), directRows.map((row, i) => {
-                                const { connector, reachability } = row;
-                                const disabled = reachability === 'not-installed' || reachability === 'unavailable';
-                                return (_jsx(WalletRowView, { styles: styles, theme: theme, icon: connector.meta.icon ?? null, walletKey: connector.id, name: connector.meta.name, subtitle: reachability === 'locked'
-                                        ? t('wallet_list.status.locked')
-                                        : reachability === 'unavailable'
-                                            ? t('wallet_list.status.unavailable')
-                                            : t('wallet_list.status.installed'), disabled: disabled, onPress: () => onConnectConnector(connector.id), badge: reachability === 'not-installed' ? (_jsx(Pressable, { style: ({ pressed }) => [styles.installButton, pressed && styles.installButtonPressed], onPress: () => onInstall(row), accessibilityRole: "button", children: _jsx(Text, { style: styles.installText, children: t('wallet_list.install') }) })) : undefined, last: i === directRows.length - 1 }, connector.id));
-                            })] })] })), additional.length > 0 && (_jsxs(View, { children: [_jsxs(Pressable, { style: ({ pressed }) => [styles.moreHeader, pressed && { opacity: 0.6 }], onPress: onToggleMore, accessibilityRole: "button", accessibilityLabel: t('wallet_list.more_wallets', { count: additional.length }), accessibilityState: { expanded: showMore }, children: [_jsx(Text, { style: styles.sectionTitle, children: t('wallet_list.more_wallets', { count: additional.length }) }), _jsx(Text, { style: [styles.moreChevron, showMore && styles.moreChevronOpen], children: "\u203A" })] }), showMore && (_jsx(View, { style: styles.sectionCard, children: additional.map((wallet, i) => (_jsx(WalletRowView, { styles: styles, theme: theme, icon: wallet.icon, walletKey: wallet.id, name: wallet.name, subtitle: t('wc.open_in_wallet'), onPress: () => onConnectMobile(wallet), last: i === additional.length - 1 }, wallet.id))) }))] }))] }));
-}
-function WalletRowView(props) {
-    const { styles, theme, icon, walletKey, name, subtitle, onPress, disabled, badge, last } = props;
-    return (_jsxs(Pressable, { style: ({ pressed }) => [styles.walletRow, !last && styles.walletRowBorder, pressed && { backgroundColor: theme.colorSurfaceHover }], onPress: onPress, disabled: disabled, accessibilityRole: "button", accessibilityLabel: name, children: [_jsx(WalletIcon, { source: icon, walletKey: walletKey, fallbackLabel: name, size: 44, radius: theme.radiusSm }), _jsxs(View, { style: styles.walletMeta, children: [_jsx(Text, { style: styles.walletName, children: name }), _jsx(Text, { style: styles.muted, children: subtitle })] }), badge ?? (_jsx(Text, { style: styles.chevron, children: "\u203A" }))] }));
-}
-// ---------------------------------------------------------------------------
-// Connecting / signing — breathe + spinner, v1.9.50 timings, wallet-branded
-// ---------------------------------------------------------------------------
-function ConnectingView(props) {
-    const { styles, theme, reducedMotion, walletName, walletIcon, walletKey, subtitle, openFailed, failedWalletName, onInstallFailedWallet, onShareUri, reopenWallet, } = props;
-    const breathe = useBreathe(reducedMotion);
-    const spinner = useSpinner(reducedMotion);
-    const spin = spinner.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-    return (_jsxs(View, { style: styles.centered, children: [_jsxs(View, { style: styles.animWrap, children: [_jsx(AnimatedBox, { scale: breathe, children: _jsx(View, { style: styles.animLogoWrap, children: _jsx(WalletIcon, { source: walletIcon, walletKey: walletKey, fallbackLabel: walletName, size: 64, radius: theme.radiusLg }) }) }), _jsx(AnimatedSpinner, { style: styles.animArc, rotate: spin, color: theme.colorAccent })] }), _jsx(Text, { style: styles.title, children: t('connecting.continue_in_wallet', { walletName }) }), _jsx(Text, { style: styles.muted, children: subtitle }), openFailed && (_jsxs(View, { style: styles.openFailedCard, children: [_jsx(Text, { style: styles.openFailedText, children: t('wc.open_failed', { walletName: failedWalletName ?? walletName }) }), _jsx(Pressable, { style: ({ pressed }) => [styles.installButton, pressed && styles.installButtonPressed], onPress: onInstallFailedWallet, accessibilityRole: "button", children: _jsx(Text, { style: styles.installText, children: t('wallet_list.install') }) }), onShareUri && (_jsx(Pressable, { style: styles.textButton, onPress: onShareUri, accessibilityRole: "button", children: _jsx(Text, { style: styles.textButtonText, children: t('wc.copy_pairing_code') }) }))] })), !openFailed && reopenWallet && (_jsx(Pressable, { style: ({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed], onPress: reopenWallet, accessibilityRole: "button", children: _jsx(Text, { style: styles.primaryButtonText, children: t('wc.open_in_wallet') }) })), !openFailed && onShareUri && (_jsx(Pressable, { style: styles.textButton, onPress: onShareUri, accessibilityRole: "button", children: _jsx(Text, { style: styles.textButtonText, children: t('wc.copy_pairing_code') }) }))] }));
-}
-/** Small helpers so the Animated primitives live in one place. */
-function AnimatedBox({ scale, children }) {
-    return _jsx(Animated.View, { style: { transform: [{ scale }] }, children: children });
-}
-function AnimatedSpinner({ style, rotate, color }) {
-    // A simple arc spinner: a bordered circle with one transparent quarter.
-    return (_jsx(Animated.View, { style: [
-            style,
-            {
-                transform: [{ rotate }],
-                borderRadius: 999,
-                borderWidth: 3,
-                borderTopColor: 'transparent',
-                borderLeftColor: 'transparent',
-                borderRightColor: color,
-                borderBottomColor: color,
-            },
-        ] }));
-}
-// ---------------------------------------------------------------------------
-// Account view
-// ---------------------------------------------------------------------------
-function AccountView(props) {
-    const { styles, theme, address, walletName, walletIcon, pendingSigns, onShare, onDisconnect } = props;
-    const shortened = `${address.slice(0, 8)}…${address.slice(-8)}`;
-    return (_jsxs(View, { children: [_jsxs(View, { style: styles.accountCard, children: [_jsx(WalletIcon, { source: walletIcon, fallbackLabel: walletName, size: 48, radius: theme.radiusMd }), _jsxs(View, { style: styles.walletMeta, children: [_jsx(Text, { style: styles.walletName, children: walletName }), _jsx(Text, { style: styles.addressText, children: shortened }), pendingSigns > 0 && _jsx(Text, { style: styles.danger, children: t('connected.pending_signatures', { count: pendingSigns }) })] })] }), _jsx(Pressable, { style: ({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed], onPress: onShare, accessibilityRole: "button", children: _jsx(Text, { style: styles.secondaryButtonText, children: t('aria.click_to_copy') }) }), _jsx(Pressable, { style: ({ pressed }) => [styles.dangerButton, pressed && styles.dangerButtonPressed], onPress: onDisconnect, accessibilityRole: "button", children: _jsx(Text, { style: styles.dangerButtonText, children: t('action.disconnect') }) })] }));
-}
-// ---------------------------------------------------------------------------
-// Error view
-// ---------------------------------------------------------------------------
-function ErrorView(props) {
-    const { styles, theme, message, onRetry } = props;
-    return (_jsxs(View, { style: styles.centered, children: [_jsx(View, { style: [styles.errorBadge, { borderColor: theme.colorDanger }], children: _jsx(Text, { style: [styles.errorBadgeText, { color: theme.colorDanger }], children: "!" }) }), _jsx(Text, { style: styles.title, children: t('error.title') }), _jsx(Text, { style: styles.muted, children: message }), _jsx(Pressable, { style: ({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed], onPress: onRetry, accessibilityRole: "button", children: _jsx(Text, { style: styles.primaryButtonText, children: t('action.try_again') }) })] }));
-}
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-function buildStyles(theme) {
-    return StyleSheet.create({
-        content: { paddingHorizontal: 20, paddingBottom: 40, gap: 14 },
-        sections: { gap: 18, paddingTop: 6 },
-        // Header
-        header: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: theme.colorBorder,
-            minHeight: 48,
-        },
-        headerTitle: { color: theme.colorText, fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
-        headerButton: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.colorSurface,
-        },
-        headerButtonPressed: { opacity: 0.6 },
-        headerButtonSpacer: { width: 36 },
-        headerButtonGlyph: { color: theme.colorText, fontSize: 22, fontWeight: '600', lineHeight: 24, marginTop: -2 },
-        centered: { alignItems: 'center', gap: 10, paddingVertical: 28 },
-        title: { color: theme.colorText, fontSize: 18, fontWeight: '700', textAlign: 'center' },
-        muted: { color: theme.colorTextMuted, fontSize: 13 },
-        // Sectioned wallet list — cards with hairline-separated rows
-        sectionTitle: {
-            color: theme.colorTextMuted,
-            fontSize: 12,
-            fontWeight: '700',
-            letterSpacing: 0.6,
-            textTransform: 'uppercase',
-        },
-        sectionCard: {
-            backgroundColor: theme.colorSurface,
-            borderRadius: theme.radiusMd,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colorBorder,
-            overflow: 'hidden',
-            marginTop: 8,
-        },
-        moreHeader: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingVertical: 10,
-            paddingHorizontal: 4,
-        },
-        moreChevron: { color: theme.colorTextMuted, fontSize: 20, fontWeight: '600', transform: [{ rotate: '90deg' }] },
-        moreChevronOpen: { transform: [{ rotate: '-90deg' }] },
-        walletRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 14,
-            paddingVertical: 12,
-            paddingHorizontal: 12,
-        },
-        walletRowBorder: {
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: theme.colorBorder,
-        },
-        walletMeta: { flex: 1, gap: 2 },
-        walletName: { color: theme.colorText, fontSize: 15, fontWeight: '600' },
-        addressText: { color: theme.colorTextMuted, fontSize: 13, letterSpacing: 0.3 },
-        chevron: { color: theme.colorTextMuted, fontSize: 22, fontWeight: '500' },
-        installButton: {
-            backgroundColor: theme.colorAccent,
-            borderRadius: theme.radiusSm,
-            paddingHorizontal: 14,
-            paddingVertical: 7,
-        },
-        installButtonPressed: { opacity: 0.7 },
-        installText: { color: theme.colorAccentText, fontSize: 13, fontWeight: '700' },
-        animWrap: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center', marginVertical: 8 },
-        animLogoWrap: { borderRadius: theme.radiusLg, overflow: 'hidden' },
-        animArc: { position: 'absolute', width: 96, height: 96 },
-        openFailedCard: {
-            alignItems: 'center',
-            gap: 10,
-            backgroundColor: theme.colorSurface,
-            borderRadius: theme.radiusMd,
-            padding: 16,
-            marginTop: 8,
-            alignSelf: 'stretch',
-        },
-        openFailedText: { color: theme.colorText, fontSize: 14, textAlign: 'center' },
-        primaryButton: {
-            backgroundColor: theme.colorAccent,
-            borderRadius: theme.radiusMd,
-            paddingVertical: 14,
-            paddingHorizontal: 20,
-            alignItems: 'center',
-            marginTop: 8,
-            alignSelf: 'stretch',
-        },
-        primaryButtonPressed: { opacity: 0.8 },
-        primaryButtonText: { color: theme.colorAccentText, fontSize: 15, fontWeight: '700' },
-        secondaryButton: {
-            borderColor: theme.colorBorder,
-            borderWidth: 1,
-            borderRadius: theme.radiusMd,
-            paddingVertical: 13,
-            alignItems: 'center',
-            marginTop: 4,
-        },
-        secondaryButtonPressed: { opacity: 0.6 },
-        secondaryButtonText: { color: theme.colorText, fontSize: 14, fontWeight: '600' },
-        dangerButton: {
-            borderColor: theme.colorDanger,
-            borderWidth: 1,
-            borderRadius: theme.radiusMd,
-            paddingVertical: 13,
-            alignItems: 'center',
-            marginTop: 4,
-        },
-        dangerButtonPressed: { opacity: 0.6 },
-        dangerButtonText: { color: theme.colorDanger, fontSize: 14, fontWeight: '600' },
-        textButton: { paddingVertical: 8, marginTop: 2 },
-        textButtonText: { color: theme.colorAccent, fontSize: 14, fontWeight: '600' },
-        accountCard: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: theme.colorSurface,
-            borderRadius: theme.radiusMd,
-            padding: 16,
-        },
-        danger: { color: theme.colorDanger, fontSize: 12, marginTop: 2 },
-        errorBadge: {
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            borderWidth: 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 4,
-        },
-        errorBadgeText: { fontSize: 28, fontWeight: '800' },
-    });
 }
 //# sourceMappingURL=AppKitModal.js.map
