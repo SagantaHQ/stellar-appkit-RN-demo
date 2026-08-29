@@ -76,6 +76,9 @@ interface AppKitDemoContextValue {
   theme: ConnectThemeRN;
   themeId: string;
   setThemeId: (id: string) => void;
+  /** Modal presentation: the @gorhom/bottom-sheet overlay, or the inline panel (web mode="inline"). */
+  presentation: 'bottomsheet' | 'inline';
+  setPresentation: (mode: 'bottomsheet' | 'inline') => void;
 }
 
 const AppKitDemoContext = createContext<AppKitDemoContextValue | null>(null);
@@ -84,6 +87,7 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [albedoView, setAlbedoView] = useState<ReactElement | null>(null);
   const [themeId, setThemeId] = useState('stellarDark');
+  const [presentation, setPresentation] = useState<'bottomsheet' | 'inline'>('bottomsheet');
 
   // The bridge renders Albedo's confirm page into a state-held element;
   // created exactly once.
@@ -133,8 +137,10 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       theme,
       themeId,
       setThemeId,
+      presentation,
+      setPresentation,
     }),
-    [client, modalOpen, openModal, closeModal, albedoView, theme, themeId]
+    [client, modalOpen, openModal, closeModal, albedoView, theme, themeId, presentation]
   );
 
   return <AppKitDemoContext.Provider value={value}>{children}</AppKitDemoContext.Provider>;

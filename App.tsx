@@ -4,10 +4,14 @@
  * Layout notes:
  * - `GestureHandlerRootView` must wrap the app — @gorhom/bottom-sheet (which
  *   the AppKit modal uses) requires a gesture-handler root.
- * - The `AppKitModal` is intentionally mounted unconditionally: it renders
- *   null while closed, but staying mounted preserves its internal state
- *   (e.g. which mobile wallet you paired with via deep link), so the signing
- *   view can still offer "reopen wallet" after the sheet has been dismissed.
+ * - In the default "bottomsheet" presentation the `AppKitModal` is
+ *   intentionally mounted unconditionally: it renders null while closed, but
+ *   staying mounted preserves its internal state (e.g. which mobile wallet
+ *   you paired with via deep link), so the signing view can still offer
+ *   "reopen wallet" after the sheet has been dismissed.
+ * - In the "inline" presentation (web `mode="inline"` parity) the panel is
+ *   embedded inside the HomeScreen scroll instead — no overlay at all — so
+ *   the root renders nothing modal.
  * - `{albedoView}` renders the Albedo confirm WebView on demand — the bridge
  *   hands us a ready-made screen element; it must live at the app root so it
  *   can cover whatever is on screen.
@@ -34,7 +38,7 @@ function isDarkColor(hex: string): boolean {
 }
 
 function Root() {
-  const { client, modalOpen, closeModal, albedoView, theme } = useAppKitDemo();
+  const { client, modalOpen, closeModal, albedoView, theme, presentation } = useAppKitDemo();
   return (
     <View style={[styles.root, { backgroundColor: theme.colorBg }]}>
       <StatusBar style={isDarkColor(theme.colorBg) ? 'light' : 'dark'} />
@@ -42,8 +46,11 @@ function Root() {
         <HomeScreen />
       </SafeAreaView>
 
-      {/* Always mounted — see the comment atop this file. */}
-      <AppKitModal client={client} open={modalOpen} onClose={closeModal} theme={theme} />
+      {/* Bottom-sheet presentation — always mounted, see the comment atop
+          this file. The inline presentation renders inside HomeScreen. */}
+      {presentation === 'bottomsheet' && (
+        <AppKitModal client={client} open={modalOpen} onClose={closeModal} theme={theme} />
+      )}
 
       {/* Albedo WebView screen (rendered on demand by the bridge). */}
       {albedoView}

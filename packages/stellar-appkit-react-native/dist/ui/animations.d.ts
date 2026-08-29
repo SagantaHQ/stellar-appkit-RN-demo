@@ -23,6 +23,25 @@ export declare function useBreathe(reducedMotion: boolean): Animated.Value;
  * The spinner — a 360° rotation loop. 2s linear to match the web modal's
  * `sak-connecting-dash 2s linear infinite`; slowed to 2.5s under reduced
  * motion (web: `animation-duration: 2.5s`), never the pre-v1.9.50 8s.
+ *
+ * Kept for backward compatibility (public export). The web-parity
+ * squircle spinner (SquircleArc) consumes `useLoopProgress` instead —
+ * the same 0→1 cycle but consumed as dash-pattern progress rather than
+ * a rotation angle.
  */
 export declare function useSpinner(reducedMotion: boolean): Animated.Value;
+/**
+ * Staggered entrance for the connecting/signing views — port of the web
+ * `.connecting-view > *` cascade: each child fades in and slides up 8px
+ * over 0.5s `cubic-bezier(0.16, 1, 0.3, 1)`, delayed 0/80/160/240ms by
+ * child index (web caps the delays at the 4th child; later children all
+ * ride the 240ms slot). Disabled entirely under reduced motion (web:
+ * `animation: none; opacity: 1`).
+ *
+ * Returns one style per child index 0..count-1.
+ */
+export declare function useEntranceStagger(count: number, reducedMotion: boolean): Array<{
+    opacity: Animated.Value;
+    translateY: Animated.Value;
+}>;
 //# sourceMappingURL=animations.d.ts.map

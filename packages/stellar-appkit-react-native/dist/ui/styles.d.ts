@@ -10,6 +10,14 @@
  * - not-installed wallets keep full opacity and carry an accent "Install"
  *   button on the right (`.wallet-install-btn`)
  * - unavailable wallets dim to 0.55 (`.wallet-row[data-unavailable]`)
+ * - the header is the web `.header` (16/18/8 padding, 15/600 title, 28×28
+ *   icon buttons) with the `.header--connecting` back-arrow variant
+ * - connecting/signing/SIWS views use the web `.connecting-view` metrics
+ *   (88×88 logo wrap, 56×56 squircle logo, 17/600 title, 14/1.5 muted
+ *   subtitle capped at 280 wide, 999-radius retry pill)
+ * - the panel footer is the web `.footer` ("Powered by Stellar AppKit")
+ * - inline mode renders the web `.inline-root .panel`: radiusLg corners,
+ *   1px colorBorder outline, no overlay/handle/close button
  *
  * Every view imports `buildStyles(theme)` output through the orchestrator's
  * `useMemo`, so a custom theme restyles the whole sheet consistently.
@@ -32,19 +40,35 @@ export declare function buildStyles(theme: ConnectThemeRN): {
     header: {
         flexDirection: "row";
         alignItems: "center";
-        justifyContent: "space-between";
+        gap: number;
         paddingHorizontal: number;
-        paddingVertical: number;
-        borderBottomWidth: number;
-        borderBottomColor: string;
+        paddingTop: number;
+        paddingBottom: number;
         minHeight: number;
+    };
+    headerBrand: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        flex: number;
+        minWidth: number;
+    };
+    headerLogo: {
+        width: number;
+        height: number;
+        borderRadius: number;
     };
     headerTitle: {
         color: string;
         fontSize: number;
-        fontWeight: "700";
+        fontWeight: "600";
+        letterSpacing: number;
         flex: number;
         textAlign: "center";
+    };
+    headerTitleLeft: {
+        textAlign: "left";
+        flex: number;
     };
     headerButton: {
         width: number;
@@ -52,20 +76,13 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         borderRadius: number;
         alignItems: "center";
         justifyContent: "center";
-        backgroundColor: string;
     };
     headerButtonPressed: {
+        backgroundColor: string;
         opacity: number;
     };
-    headerButtonSpacer: {
-        width: number;
-    };
-    headerButtonGlyph: {
-        color: string;
-        fontSize: number;
-        fontWeight: "600";
-        lineHeight: number;
-        marginTop: number;
+    headerConnecting: {
+        justifyContent: "space-between";
     };
     centered: {
         alignItems: "center";
@@ -195,21 +212,107 @@ export declare function buildStyles(theme: ConnectThemeRN): {
             rotate: string;
         }[];
     };
-    animWrap: {
+    connectingView: {
+        alignItems: "center";
+        paddingHorizontal: number;
+        paddingTop: number;
+        paddingBottom: number;
+    };
+    logoWrap: {
         width: number;
         height: number;
+        marginBottom: number;
         alignItems: "center";
         justifyContent: "center";
-        marginVertical: number;
     };
-    animLogoWrap: {
-        borderRadius: number;
-        overflow: "hidden";
-    };
-    animArc: {
-        position: "absolute";
+    connectingLogo: {
         width: number;
         height: number;
+        borderRadius: number;
+        backgroundColor: string;
+        overflow: "hidden";
+        shadowColor: string;
+        shadowOffset: {
+            width: number;
+            height: number;
+        };
+        shadowOpacity: number;
+        shadowRadius: number;
+        elevation: number;
+    };
+    logoWrapError: {
+        marginBottom: number;
+    };
+    connectingTitle: {
+        color: string;
+        fontSize: number;
+        fontWeight: "600";
+        letterSpacing: number;
+        lineHeight: number;
+        textAlign: "center";
+        marginBottom: number;
+    };
+    connectingSubtitle: {
+        color: string;
+        fontSize: number;
+        lineHeight: number;
+        textAlign: "center";
+        maxWidth: number;
+        marginBottom: number;
+    };
+    connectingSubtitleError: {
+        color: string;
+        marginBottom: number;
+    };
+    retryPill: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        borderWidth: number;
+        borderColor: string;
+    };
+    retryPillPressed: {
+        backgroundColor: string;
+        transform: {
+            scale: number;
+        }[];
+    };
+    retryPillText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+    };
+    ghostPill: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        borderWidth: number;
+        borderColor: string;
+    };
+    ghostPillPressed: {
+        backgroundColor: string;
+        transform: {
+            scale: number;
+        }[];
+    };
+    ghostPillText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+    };
+    signingErrorIcon: {
+        marginBottom: number;
+    };
+    signingActions: {
+        flexDirection: "row";
+        gap: number;
+        justifyContent: "center";
     };
     openFailedCard: {
         alignItems: "center";
@@ -305,18 +408,78 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         fontSize: number;
         marginTop: number;
     };
-    errorBadge: {
-        width: number;
-        height: number;
-        borderRadius: number;
-        borderWidth: number;
+    errorState: {
         alignItems: "center";
-        justifyContent: "center";
+        gap: number;
+        paddingVertical: number;
+        paddingHorizontal: number;
+    };
+    errorStateIcon: {
         marginBottom: number;
     };
-    errorBadgeText: {
+    errorStateTitle: {
+        color: string;
         fontSize: number;
-        fontWeight: "800";
+        fontWeight: "600";
+        textAlign: "center";
+    };
+    errorStateMessage: {
+        color: string;
+        fontSize: number;
+        lineHeight: number;
+        textAlign: "center";
+    };
+    errorStateStrong: {
+        color: string;
+        fontWeight: "700";
+    };
+    btn: {
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        borderWidth: number;
+        borderColor: string;
+        marginTop: number;
+    };
+    btnPressed: {
+        backgroundColor: string;
+        opacity: number;
+    };
+    btnText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+        textAlign: "center";
+    };
+    footer: {
+        flexDirection: "row";
+        justifyContent: "center";
+        alignItems: "center";
+        gap: number;
+        paddingVertical: number;
+        paddingHorizontal: number;
+        borderTopWidth: number;
+        borderTopColor: string;
+    };
+    footerText: {
+        color: string;
+        fontSize: number;
+    };
+    footerLink: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+    };
+    inlinePanel: {
+        borderRadius: number;
+        borderWidth: number;
+        borderColor: string;
+        backgroundColor: string;
+        overflow: "hidden";
+        alignSelf: "stretch";
+    };
+    inlineBody: {
+        maxHeight: number;
     };
 };
 export type AppKitStyles = ReturnType<typeof buildStyles>;

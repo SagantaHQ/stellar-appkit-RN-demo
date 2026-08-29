@@ -20,7 +20,11 @@ export interface WalletBranding {
     key: string | null;
 }
 /** The modal's internal view state machine. */
-export type ViewId = 'list' | 'connecting' | 'signing' | 'account' | 'error';
+export type ViewId = 'list' | 'connecting' | 'signing' | 'account' | 'error' | 'network-mismatch' | 'siws-checking' | 'siws-nonce' | 'siws-signing' | 'siws-verifying' | 'siws-error';
 /** i18n key for each view's sheet-header title (connecting/signing keep the wallet name). */
 export declare const VIEW_TITLES: Partial<Record<ViewId, string>>;
+/** SIWS phases share one component + one title. */
+export declare const SIWS_PHASES: readonly ViewId[];
+/** Which views use the web `.header--connecting` (back arrow + wallet name + close). */
+export declare function usesBackHeader(view: ViewId, hasError: boolean): boolean;
 //# sourceMappingURL=types.d.ts.map

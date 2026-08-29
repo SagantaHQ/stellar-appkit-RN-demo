@@ -18,7 +18,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useAppKit, WalletIcon } from '@saganta/stellar-appkit-react-native/ui';
+import { useAppKit, WalletIcon, AppKitModal } from '@saganta/stellar-appkit-react-native/ui';
 import { DEMO_MESSAGE, DEMO_PAYMENT_AMOUNT } from '../constants';
 import { THEMES, useAppKitDemo } from '../appkit';
 import {
@@ -43,7 +43,16 @@ interface SignOutput {
 }
 
 export function HomeScreen() {
-  const { client, openModal, theme, themeId, setThemeId, walletConnectConfigured } = useAppKitDemo();
+  const {
+    client,
+    openModal,
+    theme,
+    themeId,
+    setThemeId,
+    walletConnectConfigured,
+    presentation,
+    setPresentation,
+  } = useAppKitDemo();
   const state = useAppKit(client);
 
   const [balance, setBalance] = useState<string | null>(null);
@@ -174,6 +183,38 @@ export function HomeScreen() {
             dev server.
           </MutedText>
         </Banner>
+      )}
+
+      {/* modal presentation — bottom sheet or the embedded inline panel */}
+      <Card theme={theme}>
+        <BodyText theme={theme} style={{ fontWeight: '700' }}>
+          Modal presentation
+        </BodyText>
+        <MutedText theme={theme}>
+          The same modal, two presentations (like the web SDK): a bottom sheet over your screen, or an
+          inline panel embedded in the page for users who dislike sheets.
+        </MutedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+          <Chip
+            theme={theme}
+            label="Bottom sheet"
+            active={presentation === 'bottomsheet'}
+            accent={theme.colorAccent}
+            onPress={() => setPresentation('bottomsheet')}
+          />
+          <Chip
+            theme={theme}
+            label="Inline panel"
+            active={presentation === 'inline'}
+            accent={theme.colorAccent}
+            onPress={() => setPresentation('inline')}
+          />
+        </View>
+      </Card>
+
+      {/* inline presentation — the modal embedded in the page (web mode="inline") */}
+      {presentation === 'inline' && (
+        <AppKitModal client={client} mode="inline" open onClose={() => {}} theme={theme} />
       )}
 
       {/* session / connect */}

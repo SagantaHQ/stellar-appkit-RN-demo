@@ -67,6 +67,16 @@ which requires a project id:
   device would have to scan a QR code, so the modal never shows one. The connecting and
   account views carry
   the wallet's own name and icon (WalletConnect peer metadata), never a generic label.
+- **1:1 web-modal UI** — the modal's screens match the web SDK's specs exactly: the
+  squircle dash-arc spinner (the web's traveling-dash rounded square — not a circle —
+  rebuilt with pure Views, 2s connecting / 0.8s signing, reduced-motion aware), the
+  back-arrow header while connecting or on errors (back returns to the wallet list),
+  web error routing (a declined connect stays on the connecting view with a Try-again
+  pill; a rejected sign shows Cancel + Try again; wrong-network gets its own view),
+  the staggered entrance animations and the "Powered by Stellar AppKit" footer.
+- **Modal presentation toggle** — "Modal presentation" switches between the default
+  bottom sheet and `mode="inline"`: the same panel embedded in the page as a bordered
+  card (web `mode="inline"` parity — no overlay, no close button, always visible).
 - **Session** — address, wallet identity, live TESTNET balance from Horizon,
   `AsyncStorage`-backed persistence (sessions survive app restarts).
 - **`signMessage()`** — signs the demo message through the connected wallet and shows the
@@ -75,6 +85,11 @@ which requires a project id:
   `0.0001 XLM` self-payment with `@stellar/stellar-sdk`, and routes the XDR through AppKit's
   signing queue (the modal switches to its signing view and, for deep-link pairings, offers to
   reopen the wallet app).
+- **SIWS-ready UI** — the vendored modal ships the full Sign-In-With-Stellar flow
+  (checking session → fetching nonce → approve in wallet → verifying, with retry caps and
+  per-step timeouts, phase for phase like the web modal). This demo doesn't run a backend
+  verifier, so it isn't wired into the client config — pass `siws` to `StellarAppKit` in
+  `src/appkit.tsx` to see it.
 - **Theming** — all 10 modal themes (`minimal/stellar/sky/ocean/sunset` × dark/light) applied
   live to the modal *and* the host screen, to show that the tokens are the same as the web SDK's.
 
