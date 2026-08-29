@@ -19,12 +19,6 @@
       "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "bun test",
-    "prepublishOnly": "node ../../scripts/sync-ai-files.mjs"
-  },
   "dependencies": {
     "@albedo-link/intent": "^0.13.0",
     "@creit.tech/xbull-wallet-connect": "^0.4.0",
@@ -38,18 +32,6 @@
     "@walletconnect/sign-client": "^2.0.0",
     "intl-messageformat": "^11.2.13",
     "js-sha256": "^0.11.0"
-  },
-  "peerDependencies": {
-    "@trezor/connect-web": "^9.7.3",
-    "@trezor/connect-plugin-stellar": "^9.2.6"
-  },
-  "peerDependenciesMeta": {
-    "@trezor/connect-web": {
-      "optional": true
-    },
-    "@trezor/connect-plugin-stellar": {
-      "optional": true
-    }
   },
   "license": "MIT",
   "homepage": "https://stellar-appkit.saganta.com",

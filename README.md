@@ -119,8 +119,17 @@ does the same on the cloud. To refresh the vendored copies from a local stellar-
 
 ```bash
 node scripts/sync-vendored-package.mjs /path/to/stellar-appkit
-npm install
+bun install   # or: npm install
 ```
+
+The sync script strips `devDependencies`, `peerDependencies` and `scripts` from the vendored
+copies — critically so. The library's devDependencies (its test toolchain, `react-native ^0.78`)
+and peers must never install into the demo: **bun auto-installs them nested inside its copy of
+a `file:` package** (even when the peers are marked optional), and Metro — resolving through
+`packages/` — would then bundle that second react-native beside Expo SDK 57's, crashing Expo Go
+at startup with `TurboModuleRegistry.getEnforcing('PlatformConstants') could not be found`.
+After any sync, regenerate **both** lockfiles (`rm -rf node_modules bun.lock package-lock.json
+&& bun install`) so no stale manifest survives in a lock.
 
 Once the packages are published, swap both `file:` entries for regular version ranges and
 delete `packages/`.
@@ -181,6 +190,7 @@ Notes:
 | Freighter button says the wallet isn't installed | Install [Freighter Mobile](https://freighter.app) (iOS App Store / Google Play) and try again. |
 | "Account not found on TESTNET" | Your address was never funded on testnet — create a fresh account in your wallet (testnet mode) or fund it via [friendbot](https://friendbot.stellar.org). |
 | Expo Go says the SDK is unsupported | Update the Expo Go app on your phone to the latest version (SDK 57). |
+| `TurboModuleRegistry.getEnforcing('PlatformConstants') could not be found` | A second `react-native` got installed into the tree (bun nesting the vendored package's old devDependencies/peers). Run `rm -rf node_modules packages/stellar-appkit-react-native/node_modules bun.lock package-lock.json && bun install`, then `bunx expo start --clear`. Fixed at the source in the sync script — see "Why `file:` packages?" |
 
 ---
 
