@@ -42,4 +42,50 @@ config.resolver.unstable_conditionNames = [
   'browser',
 ];
 
+// ---------------------------------------------------------------------------
+// Disable Metro's lazy bundle splitting on native platforms.
+//
+// WHY: React Native 0.86+ dev clients request bundles with `?lazy=true`.
+// Metro then EXCLUDES every dynamic `import()` subtree from the main bundle
+// (the core SDK lazy-imports @walletconnect/sign-client, @stellar/stellar-sdk,
+// @stellar/freighter-api, ...) and serves each subtree later as a separate
+// HTTP bundle, fetched on first use — e.g. when the user taps "Connect
+// Freighter". Those split bundles get their OWN module-id space, and the ids
+// only line up with the main bundle while Metro's in-memory graph matches the
+// client's cached build. After a Metro restart, a cache clear, or any
+// node_modules churn, the split bundle is rebuilt with fresh ids — colliding
+// with (or missing from) the running module table. The result at runtime is
+//
+//   ERROR  [Error: Requiring unknown module "1407". If you are sure the
+//   module exists, try restarting Metro. ...]
+//
+// thrown from the middle of SignClient.init(), together with a mystery
+// secondary bundle build logged as e.g.
+//
+//   Android Bundled 30868ms node_modules/@walletconnect/sign-client/dist/index.js (1308 modules)
+//
+// Stripping `lazy=true` from native requests makes Metro inline the whole
+// graph into one bundle: `asyncRequire` finds no split paths and falls back
+// to a synchronous require of modules that are already registered. No
+// runtime bundle fetches, no cross-request id contract, no crash — and the
+// first connect no longer blocks on a cold 30s split-bundle build.
+const baseRewriteRequestUrl = config.server.rewriteRequestUrl;
+
+function stripLazyParam(url) {
+  if (!/[?&]lazy=true\b/.test(url)) return url;
+  const isRelative = url.startsWith('/');
+  const parsed = new URL(url, isRelative ? 'https://acme.dev' : undefined);
+  const platform = parsed.searchParams.get('platform');
+  // Only native: web dev tooling legitimately uses split chunks (preloaded
+  // via <script> tags), and this demo targets Expo Go / dev clients anyway.
+  if (platform === 'web') return url;
+  parsed.searchParams.delete('lazy');
+  return isRelative ? parsed.pathname + parsed.search : parsed.href;
+}
+
+config.server.rewriteRequestUrl = (url) => {
+  const rewritten = baseRewriteRequestUrl ? baseRewriteRequestUrl(url) : url;
+  return stripLazyParam(rewritten);
+};
+
 module.exports = config;
