@@ -1,7 +1,7 @@
 {
   "name": "stellar-appkit-rn-demo",
   "version": "1.0.0",
-  "description": "Official React Native / Expo demo for @saganta/stellar-appkit-react-native — connect, sign, and transact on Stellar from Expo Go (no native build required).",
+  "description": "Official React Native / Expo demo for @saganta/stellar-appkit-react-native \u2014 connect, sign, and transact on Stellar from Expo Go (no native build required).",
   "main": "index.ts",
   "private": true,
   "scripts": {
@@ -16,8 +16,8 @@
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@saganta/stellar-appkit": "^1.9.52",
-    "@saganta/stellar-appkit-react-native": "^1.9.52",
+    "@saganta/stellar-appkit": "file:packages/stellar-appkit",
+    "@saganta/stellar-appkit-react-native": "file:packages/stellar-appkit-react-native",
     "@stellar/stellar-sdk": "^13.0.0",
     "@walletconnect/react-native-compat": "^2.23.10",
     "buffer": "^6.0.3",
@@ -31,10 +31,8 @@
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-get-random-values": "~1.11.0",
-    "react-native-qrcode-svg": "^6.3.21",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-svg": "15.15.4",
     "react-native-webview": "13.16.1"
   },
   "devDependencies": {
