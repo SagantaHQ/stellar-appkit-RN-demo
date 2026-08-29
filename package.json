@@ -16,8 +16,8 @@
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@saganta/stellar-appkit": "^1.9.51",
-    "@saganta/stellar-appkit-react-native": "^1.9.51",
+    "@saganta/stellar-appkit": "^1.9.52",
+    "@saganta/stellar-appkit-react-native": "^1.9.52",
     "@stellar/stellar-sdk": "^13.0.0",
     "@walletconnect/react-native-compat": "^2.23.10",
     "buffer": "^6.0.3",

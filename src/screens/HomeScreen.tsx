@@ -11,14 +11,13 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Image,
   Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { useAppKit } from '@saganta/stellar-appkit-react-native/ui';
+import { useAppKit, WalletIcon } from '@saganta/stellar-appkit-react-native/ui';
 import { DEMO_MESSAGE, DEMO_PAYMENT_AMOUNT } from '../constants';
 import { THEMES, useAppKitDemo } from '../appkit';
 import {
@@ -168,8 +167,8 @@ export function HomeScreen() {
             WalletConnect pairing is not configured
           </BodyText>
           <MutedText theme={theme}>
-            The demo runs end-to-end with Albedo right now. To pair Freighter Mobile or LOBSTR over the
-            WalletConnect relay, put a free project id from cloud.walletconnect.com into{' '}
+            The demo runs end-to-end with Albedo right now. To pair Freighter, LOBSTR, HOT Wallet or
+            Scopuly over the WalletConnect relay, put a free project id from cloud.walletconnect.com into{' '}
             <MonoText theme={theme}>EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID</MonoText> (.env) and restart the
             dev server.
           </MutedText>
@@ -180,11 +179,12 @@ export function HomeScreen() {
       {connected && state.session ? (
         <Card theme={theme}>
           <View style={styles.walletRow}>
-            {state.walletIcon ? (
-              <Image source={{ uri: state.walletIcon }} style={styles.walletIcon} />
-            ) : (
-              <View style={[styles.walletIcon, { backgroundColor: theme.colorSurfaceHover }]} />
-            )}
+            <WalletIcon
+              source={state.walletIcon}
+              fallbackLabel={state.walletName ?? 'Wallet'}
+              size={44}
+              radius={12}
+            />
             <View style={{ flexShrink: 1 }}>
               <BodyText theme={theme} style={{ fontWeight: '700' }}>
                 {state.walletName ?? 'Wallet'}
@@ -212,8 +212,9 @@ export function HomeScreen() {
             No wallet connected
           </BodyText>
           <MutedText theme={theme}>
-            Tap connect to open the AppKit bottom sheet. With WalletConnect configured: Freighter Mobile
-            opens straight from a deep link, other wallets pair by QR, and Albedo runs in an in-app WebView.
+            Tap connect to open the AppKit bottom sheet. With WalletConnect configured: Freighter, LOBSTR,
+            HOT Wallet and Scopuly open straight from deep links, other wallets pair by QR, and Albedo runs
+            in an in-app WebView.
           </MutedText>
           <Button theme={theme} label="Connect Wallet" onPress={openModal} />
         </Card>
@@ -289,7 +290,7 @@ export function HomeScreen() {
       {/* footer */}
       <Card theme={theme} style={{ gap: 6 }}>
         <MutedText theme={theme}>
-          @saganta/stellar-appkit-react-native · vendored at packages/stellar-appkit-react-native
+          @saganta/stellar-appkit-react-native · from npm
         </MutedText>
         <View style={{ flexDirection: 'row', gap: 16 }}>
           <MutedText
@@ -329,10 +330,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  walletIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
   },
 });

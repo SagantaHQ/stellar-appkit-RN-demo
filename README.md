@@ -4,16 +4,17 @@ The official React Native demo for
 **[@saganta/stellar-appkit-react-native](https://github.com/SagantaHQ/stellar-appkit)** —
 Stellar AppKit's wallet-connection layer running inside **Expo Go, with no native build step at all**.
 
-Connect a Stellar wallet (Freighter Mobile via deep link, any WalletConnect wallet via QR,
-Albedo through an in-app WebView), inspect the session, sign a message, and sign a real
-TESTNET payment — all through the same themed bottom-sheet modal the web SDK ships.
+Connect a Stellar wallet — Freighter, LOBSTR, HOT Wallet or Scopuly straight from deep links,
+any other WalletConnect wallet via QR, Albedo through an in-app WebView — inspect the session,
+sign a message, and sign a real TESTNET payment, all through the same themed bottom-sheet modal
+the web SDK ships. Every wallet shows its own name and icon end-to-end.
 
 | | |
 |---|---|
 | **Stack** | Expo SDK 57 · React Native 0.86 · React 19 · TypeScript (strict) |
 | **Runtime** | Expo Go — no `expo prebuild`, no Xcode/Android Studio, no EAS build required |
 | **Network** | Stellar TESTNET |
-| **Wallets** | Freighter Mobile (deep link) · WalletConnect v2 (QR — LOBSTR, etc.) · Albedo (WebView) |
+| **Wallets** | Freighter · LOBSTR · HOT Wallet · Scopuly (deep links) · WalletConnect v2 (QR — SafePal, Hana, …) · Albedo (WebView) |
 
 ---
 
@@ -42,7 +43,8 @@ Scan the QR code with Expo Go (iOS: Camera app; Android: from inside Expo Go) an
 
 ### Enabling WalletConnect pairing (2 minutes, free)
 
-Freighter Mobile and LOBSTR pair over the WalletConnect relay, which requires a project id:
+The mobile wallets (Freighter, LOBSTR, HOT Wallet, Scopuly) pair over the WalletConnect relay,
+which requires a project id:
 
 1. Go to [cloud.walletconnect.com](https://cloud.walletconnect.com) and create a project.
 2. Copy the project id into `.env`:
@@ -55,9 +57,11 @@ Freighter Mobile and LOBSTR pair over the WalletConnect relay, which requires a 
 
 ## What the demo exercises
 
-- **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with the wallet list,
-  the mobile-first WalletConnect pairing view (tap Freighter → deep link
-  `freighterwallet://wc?uri=…`; other wallets via the QR fallback), and the Albedo WebView screen.
+- **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with the named mobile wallet
+  list (tap Freighter / LOBSTR / HOT Wallet / Scopuly → deep link `freighterwallet://wc?uri=…`
+  etc., with universal-link and store fallbacks), the QR pairing view for every other
+  WalletConnect wallet, and the Albedo WebView screen. The connecting and account views carry
+  the wallet's own name and icon (WalletConnect peer metadata), never a generic label.
 - **Session** — address, wallet identity, live TESTNET balance from Horizon,
   `AsyncStorage`-backed persistence (sessions survive app restarts).
 - **`signMessage()`** — signs the demo message through the connected wallet and shows the
