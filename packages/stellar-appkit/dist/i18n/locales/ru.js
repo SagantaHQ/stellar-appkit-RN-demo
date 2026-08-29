@@ -37,6 +37,8 @@ const ru = {
         "empty": "Нет зарегистрированных кошельков. Передайте connectors в конфигурацию StellarAppKit.",
         "not_installed": "Не установлен",
         "install": "Установить",
+        "section_stellar": "Кошельки Stellar",
+        "more_wallets": "Больше кошельков ({count})",
         "status": {
             "connecting": "Подключение…",
             "locked": "Заблокирован",
@@ -58,7 +60,8 @@ const ru = {
         "copy_uri": "Копировать URI",
         "copied": "Скопировано!",
         "generating_code": "Генерация кода связывания…",
-        "qr_failed": "Ошибка генерации QR. Используйте кнопку копирования ниже."
+        "qr_failed": "Ошибка генерации QR. Используйте кнопку копирования ниже.",
+        "copy_pairing_code": "Копировать код сопряжения"
     },
     "action": {
         "try_again": "Повторить",

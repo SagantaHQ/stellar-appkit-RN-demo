@@ -37,6 +37,8 @@ const id = {
         "empty": "Tidak ada dompet terdaftar. Lewatkan connectors ke konfigurasi StellarAppKit.",
         "not_installed": "Tidak terpasang",
         "install": "Pasang",
+        "section_stellar": "Dompet Stellar",
+        "more_wallets": "Dompet lainnya ({count})",
         "status": {
             "connecting": "Menghubungkan…",
             "locked": "Terkunci",
@@ -58,7 +60,8 @@ const id = {
         "copy_uri": "Salin URI",
         "copied": "Tersalin!",
         "generating_code": "Membuat kode pairing…",
-        "qr_failed": "Pembuatan QR gagal. Gunakan tombol salin di bawah."
+        "qr_failed": "Pembuatan QR gagal. Gunakan tombol salin di bawah.",
+        "copy_pairing_code": "Salin kode pemasangan"
     },
     "action": {
         "try_again": "Coba lagi",

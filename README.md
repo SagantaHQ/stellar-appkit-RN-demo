@@ -5,7 +5,8 @@ The official React Native demo for
 Stellar AppKit's wallet-connection layer running inside **Expo Go, with no native build step at all**.
 
 Connect a Stellar wallet — Freighter, LOBSTR, HOT Wallet or Scopuly straight from deep links,
-any other WalletConnect wallet via QR, Albedo through an in-app WebView — inspect the session,
+17 more WalletConnect-registered wallets (SafePal, Blockchain.com, Arculus, …) under "More wallets",
+Albedo through an in-app WebView — inspect the session,
 sign a message, and sign a real TESTNET payment, all through the same themed bottom-sheet modal
 the web SDK ships. Every wallet shows its own name and icon end-to-end.
 
@@ -14,7 +15,7 @@ the web SDK ships. Every wallet shows its own name and icon end-to-end.
 | **Stack** | Expo SDK 57 · React Native 0.86 · React 19 · TypeScript (strict) |
 | **Runtime** | Expo Go — no `expo prebuild`, no Xcode/Android Studio, no EAS build required |
 | **Network** | Stellar TESTNET |
-| **Wallets** | Freighter · LOBSTR · HOT Wallet · Scopuly (deep links) · WalletConnect v2 (QR — SafePal, Hana, …) · Albedo (WebView) |
+| **Wallets** | Freighter · LOBSTR · HOT Wallet · Scopuly (featured deep links) · 17 more WC-registered wallets (SafePal, Blockchain.com, Arculus, …) · Albedo (WebView) |
 
 ---
 
@@ -57,10 +58,12 @@ which requires a project id:
 
 ## What the demo exercises
 
-- **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with the named mobile wallet
-  list (tap Freighter / LOBSTR / HOT Wallet / Scopuly → deep link `freighterwallet://wc?uri=…`
-  etc., with universal-link and store fallbacks), the QR pairing view for every other
-  WalletConnect wallet, and the Albedo WebView screen. The connecting and account views carry
+- **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with a sectioned wallet list:
+  the featured Stellar wallets (tap Freighter / LOBSTR / HOT Wallet / Scopuly → deep link
+  `freighterwallet://wc?uri=…` etc., with universal-link and store fallbacks) plus every other
+  WalletConnect-registered mobile wallet under a collapsible "More wallets" section, and the
+  Albedo WebView screen. Pairing is deep-link only — on a phone the same device would have to
+  scan a QR code, so the modal never shows one. The connecting and account views carry
   the wallet's own name and icon (WalletConnect peer metadata), never a generic label.
 - **Session** — address, wallet identity, live TESTNET balance from Horizon,
   `AsyncStorage`-backed persistence (sessions survive app restarts).

@@ -6,22 +6,30 @@
  * pairing URI (`wc:...@2?relay-protocol=irn&symKey=...`) into the wallet's
  * own deep link and hand off to the OS. The wallet opens with the pairing
  * pre-loaded, the user approves, and the session completes over the
- * WalletConnect relay — no QR scan, no typing.
+ * WalletConnect relay — no QR scan, no typing. On a phone the SAME device
+ * would have to scan the QR, so deep linking is the only pairing surface
+ * the RN modal exposes (Solana-Mobile-Adapter style).
  *
  * ## Which wallets ship built-in?
  *
- * The four Stellar-first wallets with mobile apps registered against the
- * WalletConnect Stellar namespace (verified against the WalletConnect
- * Explorer registry, explorer-api.walletconnect.com, chains=stellar:pubnet):
+ * Every consumer wallet registered against the WalletConnect Explorer's
+ * Stellar namespace (verified against explorer-api.walletconnect.com,
+ * chains=stellar:pubnet) with a native mobile link:
  *
+ * Featured (Stellar-first):
  * - Freighter   — freighterwallet://  (confirmed in stellar/freighter-mobile)
  * - LOBSTR      — lobstr://           (universal: https://lobstr.co/uni/wc)
  * - HOT Wallet  — hotwallet://        (universal: https://app.hot-labs.org)
  * - Scopuly     — scopuly://wc        (universal: https://app.scopuly.com/wc)
  *
- * Any other WalletConnect wallet (SafePal, Blockchain.com, and every other
- * multichain wallet that added the Stellar namespace) still connects through
- * the generic QR pairing view.
+ * Additional (multichain wallets that registered the Stellar namespace —
+ * collapsible "More wallets" section in the modal): SafePal,
+ * Blockchain.com, Arculus, Atomic Wallet, COCA, Trustee, MaxWallet, Zypto,
+ * Hero, UKey, ECOIN, SwiftEx, Panaroma, Kotai, Cryptokara, UKISS Hub, SOC.
+ *
+ * Institutional custody platforms without consumer deep links (Anchorage,
+ * Utila, GK8) and stale registrations are intentionally excluded; anything
+ * else can be added at runtime with `registerMobileWallet()`.
  *
  * ## Link format
  *
@@ -71,6 +79,12 @@ export interface MobileWalletDeepLink {
         android: string;
     };
     /**
+     * Featured wallets render in the modal's primary "Stellar wallets"
+     * section; everything else (including runtime `registerMobileWallet()`
+     * entries, unless they opt in) collapses under "More wallets".
+     */
+    featured?: boolean;
+    /**
      * Fully overrides the built-in WalletConnect deep-link builder for this
      * wallet. Only needed if a wallet deviates from the `<link>/wc?uri=`
      * convention.
@@ -116,6 +130,10 @@ export declare function formatWalletConnectUniversalLink(universalLink: string, 
 export declare function registerMobileWallet(wallet: MobileWalletDeepLink): void;
 /** Lists all registered mobile wallets (registration order). */
 export declare function listMobileWallets(): MobileWalletDeepLink[];
+/** Lists the featured wallets — the modal's primary "Stellar wallets" section. */
+export declare function listFeaturedMobileWallets(): MobileWalletDeepLink[];
+/** Lists the non-featured wallets — the modal's collapsible "More wallets" section. */
+export declare function listAdditionalMobileWallets(): MobileWalletDeepLink[];
 /** Looks up a registered wallet by id. */
 export declare function getMobileWallet(id: string): MobileWalletDeepLink | undefined;
 /**

@@ -37,6 +37,8 @@ const es = {
         "empty": "No hay billeteras registradas. Pasa connectors en la configuración de StellarAppKit.",
         "not_installed": "No instalado",
         "install": "Instalar",
+        "section_stellar": "Billeteras de Stellar",
+        "more_wallets": "Más billeteras ({count})",
         "status": {
             "connecting": "Conectando…",
             "locked": "Bloqueada",
@@ -58,7 +60,8 @@ const es = {
         "copy_uri": "Copiar URI",
         "copied": "¡Copiado!",
         "generating_code": "Generando código de emparejamiento…",
-        "qr_failed": "Error al generar el QR. Usa el botón de copiar de abajo."
+        "qr_failed": "Error al generar el QR. Usa el botón de copiar de abajo.",
+        "copy_pairing_code": "Copiar código de emparejamiento"
     },
     "action": {
         "try_again": "Reintentar",

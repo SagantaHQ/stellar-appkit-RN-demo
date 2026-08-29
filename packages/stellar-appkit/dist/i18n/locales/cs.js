@@ -37,6 +37,8 @@ const cs = {
         "empty": "Nejsou registrovány žádné peněženky. Předejte connectors v konfiguraci StellarAppKit.",
         "not_installed": "Nenainstalováno",
         "install": "Nainstalovat",
+        "section_stellar": "Peněženky Stellar",
+        "more_wallets": "Více peněženek ({count})",
         "status": {
             "connecting": "Připojování…",
             "locked": "Uzamčeno",
@@ -58,7 +60,8 @@ const cs = {
         "copy_uri": "Kopírovat URI",
         "copied": "Zkopírováno!",
         "generating_code": "Generování párovacího kódu…",
-        "qr_failed": "Generování QR selhalo. Použijte tlačítko kopírovat níže."
+        "qr_failed": "Generování QR selhalo. Použijte tlačítko kopírovat níže.",
+        "copy_pairing_code": "Zkopírovat párovací kód"
     },
     "action": {
         "try_again": "Zkusit znovu",

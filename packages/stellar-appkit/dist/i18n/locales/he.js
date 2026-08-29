@@ -37,6 +37,8 @@ const he = {
         "empty": "אין ארנקים רשומים. העבר connectors בהגדרות StellarAppKit.",
         "not_installed": "לא מותקן",
         "install": "התקן",
+        "section_stellar": "ארנקי Stellar",
+        "more_wallets": "ארנקים נוספים ({count})",
         "status": {
             "connecting": "מתחבר…",
             "locked": "נעול",
@@ -58,7 +60,8 @@ const he = {
         "copy_uri": "העתק URI",
         "copied": "הועתק!",
         "generating_code": "מייצר קוד ציוות…",
-        "qr_failed": "יצירת QR נכשלה. השתמש בכפתור ההעתקה למטה."
+        "qr_failed": "יצירת QR נכשלה. השתמש בכפתור ההעתקה למטה.",
+        "copy_pairing_code": "העתקת קוד הצמדה"
     },
     "action": {
         "try_again": "נסה שוב",

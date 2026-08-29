@@ -37,6 +37,8 @@ const nl = {
         "empty": "Geen portemonnees geregistreerd. Geef connectors door in de StellarAppKit-configuratie.",
         "not_installed": "Niet geïnstalleerd",
         "install": "Installeren",
+        "section_stellar": "Stellar-wallets",
+        "more_wallets": "Meer wallets ({count})",
         "status": {
             "connecting": "Verbinden…",
             "locked": "Vergrendeld",
@@ -58,7 +60,8 @@ const nl = {
         "copy_uri": "URI kopiëren",
         "copied": "Gekopieerd!",
         "generating_code": "Koppelingscode genereren…",
-        "qr_failed": "QR-generatie mislukt. Gebruik de kopieerknop hieronder."
+        "qr_failed": "QR-generatie mislukt. Gebruik de kopieerknop hieronder.",
+        "copy_pairing_code": "Koppelcode kopiëren"
     },
     "action": {
         "try_again": "Opnieuw proberen",

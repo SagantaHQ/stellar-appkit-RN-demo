@@ -50,6 +50,8 @@ export declare const en: {
         readonly empty: 'No wallets registered. Pass connectors into the StellarAppKit config.';
         readonly not_installed: 'Not installed';
         readonly install: 'Install';
+        readonly section_stellar: 'Stellar wallets';
+        readonly more_wallets: 'More wallets ({count})';
         readonly status: {
             readonly connecting: 'Connecting…';
             readonly locked: 'Locked';
@@ -74,6 +76,7 @@ export declare const en: {
         readonly copied: 'Copied!';
         readonly generating_code: 'Generating QR Code…';
         readonly qr_failed: 'QR generation failed. Use the copy button below.';
+        readonly copy_pairing_code: 'Copy pairing code';
     };
     /** Action buttons — reused across views */
     readonly action: {

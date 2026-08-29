@@ -37,6 +37,8 @@ const de = {
         "empty": "Keine Wallets registriert. Überge connectors in der StellarAppKit-Konfiguration.",
         "not_installed": "Nicht installiert",
         "install": "Installieren",
+        "section_stellar": "Stellar-Wallets",
+        "more_wallets": "Weitere Wallets ({count})",
         "status": {
             "connecting": "Verbinde…",
             "locked": "Gesperrt",
@@ -58,7 +60,8 @@ const de = {
         "copy_uri": "URI kopieren",
         "copied": "Kopiert!",
         "generating_code": "Pairing-Code wird generiert…",
-        "qr_failed": "QR-Generierung fehlgeschlagen. Verwende die Schaltfläche unten zum Kopieren."
+        "qr_failed": "QR-Generierung fehlgeschlagen. Verwende die Schaltfläche unten zum Kopieren.",
+        "copy_pairing_code": "Kopplungscode kopieren"
     },
     "action": {
         "try_again": "Erneut versuchen",

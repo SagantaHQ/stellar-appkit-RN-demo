@@ -37,6 +37,8 @@ const fa = {
         "empty": "هیچ کیف پولی ثبت نشده. connectors را در پیکربندی StellarAppKit ارسال کنید.",
         "not_installed": "نصب نشده",
         "install": "نصب",
+        "section_stellar": "کیف‌پول‌های استلار",
+        "more_wallets": "کیف‌پول‌های بیشتر ({count})",
         "status": {
             "connecting": "در حال اتصال…",
             "locked": "قفل شده",
@@ -58,7 +60,8 @@ const fa = {
         "copy_uri": "کپی URI",
         "copied": "کپی شد!",
         "generating_code": "در حال تولید کد جفت…",
-        "qr_failed": "تولید QR ناموفق بود. از دکمه کپی زیر استفاده کنید."
+        "qr_failed": "تولید QR ناموفق بود. از دکمه کپی زیر استفاده کنید.",
+        "copy_pairing_code": "کپی کد اتصال"
     },
     "action": {
         "try_again": "تلاش مجدد",

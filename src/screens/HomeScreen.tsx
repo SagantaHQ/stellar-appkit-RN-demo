@@ -2,8 +2,9 @@
  * HomeScreen — the demo itself.
  *
  * Shows the four things every Stellar AppKit RN integration needs:
- *   1. Connect   — open the AppKit modal (bottom sheet): Freighter Mobile via
- *                  deep link, any WalletConnect wallet via QR, Albedo via WebView.
+ *   1. Connect   — open the AppKit modal (bottom sheet): named mobile wallets
+ *                  via deep link (21 built-in, deep-link only — no QR on a
+ *                  phone), Albedo via WebView.
  *   2. Session   — address, wallet, network, live TESTNET balance (Horizon).
  *   3. Sign      — signMessage() and signTransaction() through whichever wallet
  *                  is connected; results rendered as XDR / signature blocks.
