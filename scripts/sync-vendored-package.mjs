@@ -32,6 +32,17 @@ const PACKAGES = [
   { src: 'siws-verify', dest: 'stellar-appkit-siws-verify' },
 ];
 
+/** Recursively forces regular files under `root` to mode 644 (keeps dirs 755). */
+function normalizeModes(root) {
+  const stat = fs.lstatSync(root);
+  if (stat.isDirectory()) {
+    for (const entry of fs.readdirSync(root)) normalizeModes(path.join(root, entry));
+    fs.chmodSync(root, 0o755);
+  } else if (stat.isFile()) {
+    fs.chmodSync(root, 0o644);
+  }
+}
+
 if (!fs.existsSync(path.join(repoRoot, 'packages/core/package.json'))) {
   console.error(`No packages/core at ${repoRoot} — pass the stellar-appkit repo path as the first argument.`);
   process.exit(1);
@@ -57,6 +68,10 @@ for (const { src, dest } of PACKAGES) {
       continue;
     }
     fs.cpSync(from, path.join(destRoot, entry), { recursive: true });
+    // The library checkout may carry executable bits (tsc output under
+    // some umasks, chmod'd sources). Vendored copies must stay 644 — a
+    // mode-only diff of 300+ files otherwise pollutes every sync commit.
+    normalizeModes(path.join(destRoot, entry));
     console.log(`  copied: ${entry}`);
   }
 
