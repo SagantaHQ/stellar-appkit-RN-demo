@@ -44,6 +44,7 @@
     "@walletconnect/core": "2.23.10",
     "@walletconnect/utils": "2.23.10",
     "@walletconnect/types": "2.23.10",
-    "@walletconnect/react-native-compat": "2.23.10"
+    "@walletconnect/react-native-compat": "2.23.10",
+    "@noble/hashes": "1.8.0"
   }
 }

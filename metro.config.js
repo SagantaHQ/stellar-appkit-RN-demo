@@ -1,16 +1,16 @@
 /**
  * Metro config for the demo.
  *
- * The only customization: stubbing browser-only peer dependencies of
- * @saganta/stellar-appkit (the Trezor hardware-wallet SDK). The core SDK
- * imports them lazily inside the Trezor connector factory — that connector
- * is never registered on React Native (`defaultReactNativeConnectors()`
- * registers WalletConnect + Albedo only) — but Metro statically resolves
- * every visible `import()` at bundle time, so without a stub the bundle
- * fails to build. Stubbing keeps the Expo Go bundle free of a web-extension
- * SDK it would never execute.
+ * Customizations:
+ * 1. Stubbing browser-only peer dependencies of @saganta/stellar-appkit
+ *    (the Trezor hardware-wallet SDK).
+ * 2. Direct file resolution for the WalletConnect crypto tree's deep CJS
+ *    subpaths (@noble/hashes, uint8arrays, multiformats) — see the
+ *    DEEP_CJS_PACKAGES section below for why.
  */
 const { getDefaultConfig } = require('expo/metro-config');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const config = getDefaultConfig(__dirname);
 
@@ -19,10 +19,78 @@ const RN_BROWSER_STUBS = new Set([
   '@trezor/connect-plugin-stellar',
 ]);
 
+// ---------------------------------------------------------------------------
+// Deep-CJS subpath resolver for the WalletConnect dependency tree.
+//
+// WHY: the crypto packages WalletConnect depends on (@noble/hashes,
+// uint8arrays, multiformats) publish `exports` maps whose condition targets
+// are nested CJS files — "./from-string" -> "./cjs/src/from-string.js",
+// "./crypto" -> "./crypto.js" — that are NOT themselves keys of the `exports`
+// map (@noble/curves, by contrast, lists both "./ed25519" and "./ed25519.js",
+// which is why it never warns). Metro expands the target, re-validates it
+// against the same `exports` map, fails, and logs on every cold start:
+//
+//   WARN Attempted to import the module ".../uint8arrays/cjs/src/from-string.js"
+//   which is not listed in the "exports" of "uint8arrays" under the requested
+//   subpath "./cjs/src/from-string.js". Falling back to file-based resolution.
+//
+// The fallback lands on the right file, so the warnings are cosmetic — but
+// there are five of them on every startup and they look like errors. Older
+// WalletConnect releases also import some of these deep paths literally
+// ("uint8arrays/cjs/src/from-string.js"), which triggers the same warning
+// through the same code path. Resolving these specifiers straight to their
+// files here skips the exports dance entirely: same module, zero warnings,
+// works identically for fresh and stale installs.
+const DEEP_CJS_PACKAGES = new Set(['@noble/hashes', 'uint8arrays', 'multiformats']);
+
+/** Split "@scope/pkg/sub/path" / "pkg/sub/path" into { pkg, sub }. */
+function splitPkgSub(moduleName) {
+  const parts = moduleName.split('/');
+  if (moduleName.startsWith('@')) {
+    if (parts.length < 3) return null; // bare scoped package ("@scope/pkg")
+    return { pkg: `${parts[0]}/${parts[1]}`, sub: parts.slice(2).join('/') };
+  }
+  if (parts.length < 2) return null; // bare package ("uint8arrays")
+  return { pkg: parts[0], sub: parts.slice(1).join('/') };
+}
+
+/** Nearest node_modules/<pkg> walking up from the importing file. */
+function nearestPackageDir(originDir, pkg) {
+  let dir = originDir;
+  for (;;) {
+    const candidate = path.join(dir, 'node_modules', pkg);
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/** Resolve a deep-CJS specifier directly to a file, or null to opt out. */
+function resolveDeepCjs(originModulePath, moduleName) {
+  const split = splitPkgSub(moduleName);
+  if (!split || !DEEP_CJS_PACKAGES.has(split.pkg)) return null;
+  const pkgDir = nearestPackageDir(path.dirname(originModulePath), split.pkg);
+  if (!pkgDir) return null;
+  const withExt = /\.(js|cjs|mjs)$/.test(split.sub) ? split.sub : `${split.sub}.js`;
+  // Order mirrors what Metro's file fallback picks today: the exact path
+  // first (stale trees request these literally), then the package's CJS
+  // build, then its ESM build.
+  for (const rel of [withExt, path.join('cjs/src', withExt), path.join('esm/src', withExt)]) {
+    const filePath = path.join(pkgDir, rel);
+    if (fs.existsSync(filePath)) return { type: 'sourceFile', filePath };
+  }
+  return null;
+}
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (RN_BROWSER_STUBS.has(moduleName)) {
     // `type: 'empty'` makes Metro resolve the module to an empty shim.
     return { type: 'empty' };
+  }
+  if (context.originModulePath) {
+    const direct = resolveDeepCjs(context.originModulePath, moduleName);
+    if (direct) return direct;
   }
   // Defer to the standard resolution for everything else.
   return context.resolveRequest(context, moduleName, platform);

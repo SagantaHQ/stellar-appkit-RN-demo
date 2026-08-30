@@ -149,7 +149,7 @@ After any sync, regenerate **both** lockfiles (`rm -rf node_modules bun.lock pac
 Once the packages are published, swap both `file:` entries for regular version ranges and
 delete `packages/`.
 
-### The two Metro tweaks (`metro.config.js`)
+### The Metro tweaks (`metro.config.js`)
 
 1. **Trezor stubs** — core's Trezor connector lazily imports `@trezor/connect-web` /
    `@trezor/connect-plugin-stellar` (browser-only peer deps, never instantiated on RN). Metro
@@ -160,6 +160,18 @@ delete `packages/`.
    resolve. Adding the `browser` condition makes it resolve to its self-contained
    `dist/stellar-sdk.min.js` (the same build the legacy `browser` field already selected before
    `exports` support). Packages that ship an explicit `react-native` condition still win.
+3. **Deep-CJS subpath resolver** — the WalletConnect crypto tree (`@noble/hashes`,
+   `uint8arrays`, `multiformats`) publishes `exports` maps whose condition targets
+   (`./crypto.js`, `./cjs/src/from-string.js`, …) are not themselves `exports` keys, so Metro's
+   exports resolution warns (`Attempted to import … not listed in the "exports" …`) before
+   falling back to the same file it would have picked. The resolver maps these specifiers
+   straight to their files — same module, zero warnings. See the
+   `DEEP_CJS_PACKAGES` block in `metro.config.js` for the details.
+4. **Lazy-bundle-splitting strip** — RN 0.86+/Expo 57 dev clients request `?lazy=true` bundles,
+   which split dynamic `import()` subtrees into separately-fetched bundles with their own
+   module-id space; when the graph drifts the ids stop lining up (`Requiring unknown module
+   "1407"`). The config strips `lazy=true` from native requests so the whole graph ships as one
+   inline bundle. Full story in the Troubleshooting table and the config's header comment.
 
 ---
 
@@ -207,7 +219,7 @@ Notes:
 | Expo Go says the SDK is unsupported | Update the Expo Go app on your phone to the latest version (SDK 57). |
 | `TurboModuleRegistry.getEnforcing('PlatformConstants') could not be found` | A second `react-native` got installed into the tree (bun nesting the vendored package's old devDependencies/peers). Run `rm -rf node_modules packages/stellar-appkit-react-native/node_modules bun.lock package-lock.json && bun install`, then `bunx expo start --clear`. Fixed at the source in the sync script — see "Why `file:` packages?" |
 | `Requiring unknown module "<number>"` when connecting a wallet (often right after a long `Bundled … node_modules/@walletconnect/sign-client/dist/index.js (N modules)` line) | Metro's **lazy bundle splitting** (RN 0.86+/Expo 57 dev clients send `?lazy=true`) splits every dynamic `import()` subtree into a separate runtime-fetched bundle with its own module-id space. If Metro restarts or the graph drifts between the main bundle and the split bundle, the ids no longer line up and the running app dies on a missing id. **Already fixed in this repo** — `metro.config.js` strips `lazy=true` from native requests so the whole graph ships as one inline bundle. If you still see it: `git pull`, then `bunx expo start --clear`. If you use the npm packages in your own app, see the "Expo Go development" note in the React Native package README. |
-| Metro warns `Attempted to import the module …/uint8arrays/cjs/src/from-string.js … not listed in the "exports" … Falling back to file-based resolution` (same for `multiformats/cjs/src/basics.js`, `@noble/hashes/crypto.js`) | **Harmless.** These come from deep imports inside the WalletConnect dependency tree (@walletconnect/utils → uint8arrays/multiformats, @noble/hashes's self-import of `./crypto.js`). Metro falls back to file-based resolution and the bundle works. Every WalletConnect-on-Metro app shows these warnings. |
+| Metro warns `Attempted to import the module …/uint8arrays/cjs/src/from-string.js … not listed in the "exports" … Falling back to file-based resolution` (same for `multiformats/cjs/src/basics.js`, `@noble/hashes/crypto.js`, and a nested `@noble/curves/node_modules/@noble/hashes/crypto.js`) | **Fixed in this repo.** Root cause: `@noble/hashes`, `uint8arrays` and `multiformats` publish `exports` maps whose require targets (`./crypto.js`, `./cjs/src/from-string.js`, …) are not themselves `exports` keys — Metro expands the target, re-validates it against the same map, fails and warns before falling back to the very same file. `metro.config.js` now resolves those specifiers directly (`DEEP_CJS_PACKAGES`), and `@noble/hashes` is deduped to a single 1.8.0 copy via a package.json `overrides` entry (it used to nest 1.7.x copies under `@noble/curves` and `@walletconnect/relay-auth`). If you still see them: `git pull`, then `rm -rf node_modules && bun install && bunx expo start --clear` — warnings from an install older than the WalletConnect 2.23.10 pin just mean a stale tree. |
 
 ---
 
