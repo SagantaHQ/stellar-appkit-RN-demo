@@ -29,6 +29,7 @@ const vendorDir = path.resolve(import.meta.dirname, '../packages');
 const PACKAGES = [
   { src: 'core', dest: 'stellar-appkit' },
   { src: 'react-native', dest: 'stellar-appkit-react-native' },
+  { src: 'siws-verify', dest: 'stellar-appkit-siws-verify' },
 ];
 
 if (!fs.existsSync(path.join(repoRoot, 'packages/core/package.json'))) {

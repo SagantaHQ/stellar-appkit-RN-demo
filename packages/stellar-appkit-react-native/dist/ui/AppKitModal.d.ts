@@ -18,11 +18,25 @@
  *
  * UX parity with the web `<stellar-appkit-modal>` (ui-web connect-modal.ts):
  *
+ * - **Transaction preview** — the modal installs itself as the client's
+ *   `onPreviewTransaction` handler (same as the web modal), so every
+ *   signTransaction()/signMessage() first shows the decoded preview
+ *   (operations, risk flags, fee, source account) with Cancel + Sign /
+ *   Approve. Approve → signing view; Cancel → back to the account view;
+ *   "Try again" after a wallet rejection re-shows the approved preview.
  * - **Error routing** matches the web exactly: a failed connect stays on
  *   the connecting view (its error variant: wallet logo, danger subtitle,
  *   "Try again" pill); a rejected sign stays on the signing view (Cancel +
  *   Try again); NetworkMismatchError opens the wrong-network view;
  *   everything else opens the generic error state.
+ * - **Connected view** — the full web account panel: deterministic avatar,
+ *   tap-to-copy address, network pill, explorer link, overflow menu
+ *   (Switch Wallet / Disconnect), pending-signature banner, XLM balance
+ *   with skeleton + 10s silent polling, "Get Testnet funds" (friendbot)
+ *   with the 3s funding banner, and the Recent Activity list.
+ * - **i18n** — every string is `t()`-resolved and the sheet re-renders on
+ *   `setLocale()` (all 25 core locales). `detectDeviceLocale()` /
+ *   `applyDeviceLocale()` wire the device language at app init.
  * - **Back arrow** — while connecting (error or not), on SIWS errors and
  *   on signing errors the header shows the `.header--connecting` variant:
  *   back chevron + centered wallet name + close. Back cancels the state

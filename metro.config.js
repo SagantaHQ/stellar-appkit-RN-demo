@@ -4,7 +4,10 @@
  * Customizations:
  * 1. Stubbing browser-only peer dependencies of @saganta/stellar-appkit
  *    (the Trezor hardware-wallet SDK).
- * 2. Direct file resolution for the WalletConnect crypto tree's deep CJS
+ * 2. Mapping the bare Node `crypto` specifier onto src/node-crypto-shim.js
+ *    (createHash via @noble/hashes) so the vendored siws-verify package —
+ *    whose signature verifier pre-hashes candidate messages — runs on RN.
+ * 3. Direct file resolution for the WalletConnect crypto tree's deep CJS
  *    subpaths (@noble/hashes, uint8arrays, multiformats) — see the
  *    DEEP_CJS_PACKAGES section below for why.
  */
@@ -87,6 +90,11 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (RN_BROWSER_STUBS.has(moduleName)) {
     // `type: 'empty'` makes Metro resolve the module to an empty shim.
     return { type: 'empty' };
+  }
+  // Bare Node 'crypto' → the noble-backed shim. Only app-land code requests
+  // it (siws-verify's createHash calls); Metro never needs Node crypto itself.
+  if (moduleName === 'crypto' || moduleName === 'node:crypto') {
+    return { type: 'sourceFile', filePath: path.join(__dirname, 'src/node-crypto-shim.js') };
   }
   if (context.originModulePath) {
     const direct = resolveDeepCjs(context.originModulePath, moduleName);

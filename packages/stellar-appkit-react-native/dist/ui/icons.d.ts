@@ -24,6 +24,20 @@ export declare function CheckIcon({ color, size }: IconProps): React.JSX.Element
 /** icons.externalLink — `M8 5H15V12` + `M15 5L6 14`. */
 export declare function ExternalLinkIcon({ color, size }: IconProps): React.JSX.Element;
 /**
+ * icons.copy — web: `<rect x="7" y="7" width="9" height="9" rx="1.5"/>`
+ * + `M13 7V5.5C13 4.67 12.33 4 11.5 4H5.5C4.67 4 4 4.67 4 5.5V11.5
+ * C4 12.33 4.67 13 5.5 13H7` (front sheet + back sheet bracket).
+ */
+export declare function CopyIcon({ color, size }: IconProps): React.JSX.Element;
+/**
+ * icons.logOut — web: `M8 4H5.5C4.67 4 4 4.67 4 5.5V14.5C4 15.33 4.67 16
+ * 5.5 16H8` (door bracket) + `M13 13.5L16.5 10L13 6.5` (arrowhead)
+ * + `M16 10H8` (arrow shaft).
+ */
+export declare function LogOutIcon({ color, size }: IconProps): React.JSX.Element;
+/** The overflow "⋯" glyph (web renders three inline SVG circles at 20×20). */
+export declare function MoreDotsIcon({ color, size }: IconProps): React.JSX.Element;
+/**
  * icons.alertCircle — ring + stem + dot (error / network-mismatch views).
  * Web: `<circle cx="10" cy="10" r="7"/>` + `M10 6.5V10.5` + filled r=0.9 dot.
  */

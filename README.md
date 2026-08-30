@@ -75,22 +75,45 @@ which requires a project id:
   web error routing (a declined connect stays on the connecting view with a Try-again
   pill; a rejected sign shows Cancel + Try again; wrong-network gets its own view),
   the staggered entrance animations and the "Powered by Stellar AppKit" footer.
+- **Transaction preview (web 1:1)** — every `signMessage()` / `signTransaction()` first
+  opens the modal's preview: app + wallet thumbnails, "Sign message" vs "Review
+  transaction" copy, one card per decoded operation with risk flags, the mono
+  source-account + fee meta row, and Cancel / Sign / Approve. Approve hands off to
+  the wallet; canceling settles back on the account view; "Try again" after a wallet
+  rejection re-shows the approved preview — the exact web flow.
+- **Connected account view (web 1:1)** — deterministic avatar, tap-to-copy address,
+  network pill, explorer link, overflow menu (Switch Wallet / Disconnect), pending
+  signature banner, XLM balance with skeleton + silent 10s polling, "Get Testnet
+  funds" (friendbot) and the Recent Activity list — all inside the modal.
+- **25-locale i18n** — the device language is applied at startup
+  (`applyDeviceLocale()`), and the Language card live-switches all 25 core locales;
+  every modal screen (list, preview, account, SIWS) translates instantly.
 - **Modal presentation toggle** — "Modal presentation" switches between the default
   bottom sheet and `mode="inline"`: the same panel embedded in the page as a bordered
   card (web `mode="inline"` parity — no overlay, no close button, always visible).
 - **Session** — address, wallet identity, live TESTNET balance from Horizon,
   `AsyncStorage`-backed persistence (sessions survive app restarts).
-- **`signMessage()`** — signs the demo message through the connected wallet and shows the
-  signature plus `signedData` (the exact bytes the wallet signed — what a SIWS verifier needs).
+- **`signMessage()`** — signs the demo message through the connected wallet (via the
+  preview) and shows the signature plus `signedData` (the exact bytes the wallet
+  signed — what a SIWS verifier needs).
 - **`signTransaction()`** — fetches your account sequence from TESTNET Horizon, builds a
   `0.0001 XLM` self-payment with `@stellar/stellar-sdk`, and routes the XDR through AppKit's
   signing queue (the modal switches to its signing view and, for deep-link pairings, offers to
   reopen the wallet app).
-- **SIWS-ready UI** — the vendored modal ships the full Sign-In-With-Stellar flow
-  (checking session → fetching nonce → approve in wallet → verifying, with retry caps and
-  per-step timeouts, phase for phase like the web modal). This demo doesn't run a backend
-  verifier, so it isn't wired into the client config — pass `siws` to `StellarAppKit` in
-  `src/appkit.tsx` to see it.
+- **Send XLM (sign + submit)** — the web demo's `send-xlm` flow on RN: enter any
+  recipient + amount (empty recipient sends to yourself), build the payment, approve
+  the preview, let the wallet sign, then submit the envelope to TESTNET Horizon —
+  the recipient actually receives the XLM, and the result links to the explorer.
+- **SIWS (Sign-In With Stellar)** — toggle SIWS on and the full sign-in flow runs after
+  connect (checking session → fetching nonce → approve in wallet → verifying, with
+  retry caps and per-step timeouts, phase for phase like the web modal). No backend
+  needed: the nonce is generated on-device and the signature is verified by the real
+  `@saganta/stellar-appkit-siws-verify` package running as an on-device "server"
+  (Node's `crypto` is provided by `src/node-crypto-shim.js`, a `@noble/hashes`-backed
+  createHash routed in `metro.config.js`). The session persists in `AsyncStorage` and
+  the card shows the signed-in address + expiry with a Sign-out button.
+- **Friendbot faucet** — one-tap "Get Testnet funds" in the demo (and in the modal's
+  account view) credits 10,000 test XLM.
 - **Theming** — all 10 modal themes (`minimal/stellar/sky/ocean/sunset` × dark/light) applied
   live to the modal *and* the host screen, to show that the tokens are the same as the web SDK's.
 
@@ -104,11 +127,13 @@ The interesting files, in the order the app loads them:
 |---|---|
 | `index.ts` | Entry point — imports `./src/polyfills` **before** everything else. |
 | `src/polyfills.ts` | The Expo Go-safe polyfill dance (see below). |
-| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, the WalletConnect warm-up, theme state. |
+| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, the WalletConnect warm-up + session restore, theme + locale state, and the SIWS "server-in-your-pocket" config (nonce/session/verify/signout backed by AsyncStorage + `siws-verify`). |
 | `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` at the root. |
-| `src/stellar.ts` | Building the demo transaction — plain Horizon `fetch` + stellar-sdk (AppKit signs; building XDR is your app's job). |
-| `src/screens/HomeScreen.tsx` | The demo UI and both sign flows. |
-| `metro.config.js` | Four Expo Go-specific resolver tweaks (see below). |
+| `src/stellar.ts` | Demo Stellar helpers — plain Horizon `fetch` for account/balance, stellar-sdk XDR builders, `submitSignedTx()` (REST submit), friendbot faucet, SIWS nonce (AppKit signs; building/submitting XDR is your app's job). |
+| `src/node-crypto-shim.js` | `createHash('sha256'/'sha512')` via `@noble/hashes` — stands in for Node's `crypto` so `siws-verify` runs on-device (routed in metro.config.js). |
+| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, sign (message + self-payment), send XLM (sign + submit), SIWS, friendbot, theme. |
+| `scripts/test-siws-e2e.mjs` | Node-run e2e proof of the SIWS verification path (valid sign-in, wrong nonce/domain, foreign signature, SEP-0053 hashed signing). |
+| `metro.config.js` | Five Expo Go-specific resolver tweaks (see below). |
 
 ### Polyfills, Expo Go edition
 
@@ -126,8 +151,9 @@ never executes.
 dependency are **vendored** under `packages/` and referenced as `file:` dependencies:
 
 ```
-packages/stellar-appkit              ← @saganta/stellar-appkit (core, Metro-safe build)
-packages/stellar-appkit-react-native ← the RN package (prebuilt dist/ included)
+packages/stellar-appkit                    ← @saganta/stellar-appkit (core, Metro-safe build)
+packages/stellar-appkit-react-native       ← the RN package (prebuilt dist/ included)
+packages/stellar-appkit-siws-verify        ← SIWS verification (the demo's on-device "server")
 ```
 
 `npm install` copies them into `node_modules` like any other dependency, and EAS build/update
@@ -161,18 +187,26 @@ delete `packages/`.
    resolve. Adding the `browser` condition makes it resolve to its self-contained
    `dist/stellar-sdk.min.js` (the same build the legacy `browser` field already selected before
    `exports` support). Packages that ship an explicit `react-native` condition still win.
-3. **Deep-CJS subpath resolver** — the WalletConnect crypto tree (`@noble/hashes`,
+3. **Node `crypto` → noble shim** — the vendored `@saganta/stellar-appkit-siws-verify`
+   (the demo's on-device SIWS verifier) calls `createHash('sha256'/'sha512')` for its
+   signature candidates. Metro can't resolve Node builtins, so bare `crypto` /
+   `node:crypto` map to `src/node-crypto-shim.js` — `createHash` backed by
+   `@noble/hashes` (already in the tree via WalletConnect), digests verified
+   byte-for-byte against noble in `scripts/test-siws-e2e.mjs`. Anything but
+   sha256/sha512 throws loudly.
+4. **Deep-CJS subpath resolver** — the WalletConnect crypto tree (`@noble/hashes`,
    `uint8arrays`, `multiformats`) publishes `exports` maps whose condition targets
    (`./crypto.js`, `./cjs/src/from-string.js`, …) are not themselves `exports` keys, so Metro's
    exports resolution warns (`Attempted to import … not listed in the "exports" …`) before
    falling back to the same file it would have picked. The resolver maps these specifiers
    straight to their files — same module, zero warnings. See the
    `DEEP_CJS_PACKAGES` block in `metro.config.js` for the details.
-4. **Lazy-bundle-splitting strip** — RN 0.86+/Expo 57 dev clients request `?lazy=true` bundles,
+5. **Lazy-bundle-splitting strip** — RN 0.86+/Expo 57 dev clients request `?lazy=true` bundles,
    which split dynamic `import()` subtrees into separately-fetched bundles with their own
    module-id space; when the graph drifts the ids stop lining up (`Requiring unknown module
    "1407"`). The config strips `lazy=true` from native requests so the whole graph ships as one
-   inline bundle. Full story in the Troubleshooting table and the config's header comment.
+   inline bundle (which is also why all 25 locale files land in the app — `setLocale()` never
+   needs a network fetch). Full story in the Troubleshooting table and the config's header comment.
 
 ---
 

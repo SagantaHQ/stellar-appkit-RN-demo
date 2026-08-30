@@ -19,4 +19,5 @@ export { defaultReactNativeConnectors, createAlbedoWebViewConnector, createXBull
 export { createAsyncStorage, createMemoryStorage, type KeyValueLikeStorage, } from './storage.js';
 export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, type MobileWalletDeepLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';
+export { detectDeviceLocale, applyDeviceLocale, normalizeToDeviceLocale, } from './locale.js';
 //# sourceMappingURL=index.d.ts.map

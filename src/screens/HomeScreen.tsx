@@ -1,14 +1,25 @@
 /**
  * HomeScreen — the demo itself.
  *
- * Shows the four things every Stellar AppKit RN integration needs:
- *   1. Connect   — open the AppKit modal (bottom sheet): named mobile wallets
- *                  via deep link (21 built-in, deep-link only — no QR on a
- *                  phone), Albedo via WebView.
- *   2. Session   — address, wallet, network, live TESTNET balance (Horizon).
- *   3. Sign      — signMessage() and signTransaction() through whichever wallet
- *                  is connected; results rendered as XDR / signature blocks.
- *   4. Theme     — all 10 modal themes, live-switched, also restyling this screen.
+ * One card per capability, mirroring the web demo suite:
+ *   1. Connect / session  — open the AppKit modal (bottom sheet or inline):
+ *                           21 deep-link mobile wallets, Albedo + xBull via
+ *                           WebView, live TESTNET balance.
+ *   2. Language           — all 25 core locales, live-switched (the modal,
+ *                           preview, account view and SIWS screens all
+ *                           translate instantly; the device language is the
+ *                           default at startup).
+ *   3. Sign               — signMessage() and signTransaction(). Both now go
+ *                           through the modal's transaction PREVIEW first —
+ *                           decoded operations, risk flags, fee — exactly
+ *                           like the web SDK, then the wallet prompt.
+ *   4. Send XLM           — build → preview → sign → SUBMIT to Testnet. The
+ *                           recipient really receives the XLM.
+ *   5. SIWS               — Sign-In With Stellar: connect + sign-in + real
+ *                           signature verification (the siws-verify package
+ *                           runs as an on-device "server"), session status.
+ *   6. Testnet funds      — friendbot faucet + balance refresh.
+ *   7. Theme              — all 10 modal themes, live-switched.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -19,8 +30,9 @@ import {
   View,
 } from 'react-native';
 import { useAppKit, WalletIcon, AppKitModal } from '@saganta/stellar-appkit-react-native/ui';
+import type { SiwsSession } from '@saganta/stellar-appkit-react-native';
 import { DEMO_MESSAGE, DEMO_PAYMENT_AMOUNT } from '../constants';
-import { THEMES, useAppKitDemo } from '../appkit';
+import { LOCALES, THEMES, useAppKitDemo } from '../appkit';
 import {
   Badge,
   Banner,
@@ -29,13 +41,20 @@ import {
   Card,
   Chip,
   CodeBlock,
+  Field,
   MutedText,
   MonoText,
   Row,
   Title,
   shortAddress,
 } from '../components/ui';
-import { buildSelfPaymentXdr, fetchAccountInfo } from '../stellar';
+import {
+  buildPaymentXdr,
+  buildSelfPaymentXdr,
+  fetchAccountInfo,
+  fundTestnetAccount,
+  submitSignedTx,
+} from '../stellar';
 
 interface SignOutput {
   title: string;
@@ -52,6 +71,10 @@ export function HomeScreen() {
     walletConnectConfigured,
     presentation,
     setPresentation,
+    locale,
+    setAppLocale,
+    siwsEnabled,
+    setSiwsEnabled,
   } = useAppKitDemo();
   const state = useAppKit(client);
 
@@ -60,6 +83,17 @@ export function HomeScreen() {
   const [signOutput, setSignOutput] = useState<SignOutput | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'message' | 'transaction' | null>(null);
+
+  // Send-XLM example state
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('1');
+  const [sendBusy, setSendBusy] = useState<'building' | 'signing' | 'submitting' | null>(null);
+  const [sendResult, setSendResult] = useState<{ hash: string; explorerUrl: string } | null>(null);
+
+  // SIWS state
+  const [siwsSession, setSiwsSession] = useState<SiwsSession | null>(null);
+  const [fundBusy, setFundBusy] = useState(false);
+  const [fundMessage, setFundMessage] = useState<string | null>(null);
   const wasPending = useRef(false);
 
   const connected = state.status === 'connected' && state.session != null;
@@ -81,9 +115,10 @@ export function HomeScreen() {
     if (connected) void loadBalance();
   }, [connected, loadBalance]);
 
-  // ----------------------------------------------------- signing UX wiring --
+  // -------------------------------------------------- signing UX wiring --
   // When a sign request enters the queue, re-open the modal so the user sees
-  // the signing view (and, for deep-link pairings, the "reopen wallet" button).
+  // the PREVIEW (decoded operations + fee) — approve it and the signing view
+  // takes over; for deep-link pairings it also offers "reopen wallet".
   useEffect(() => {
     const pending = state.pendingSignCount > 0;
     if (pending && !wasPending.current) {
@@ -93,6 +128,14 @@ export function HomeScreen() {
     }
     wasPending.current = pending;
   }, [state.pendingSignCount, openModal]);
+
+  // ------------------------------------------------------------- SIWS state --
+  useEffect(() => {
+    const update = () => setSiwsSession(client.siwsSession);
+    update();
+    const off = client.on('siwsSessionChange', update);
+    return off;
+  }, [client]);
 
   // ------------------------------------------------------------- actions ----
   const signMessageDemo = useCallback(async () => {
@@ -138,11 +181,59 @@ export function HomeScreen() {
     }
   }, [client, state.session]);
 
+  // Send XLM — the web demo's send-xlm flow on RN: build the payment, sign it
+  // through the modal's preview, then submit the signed envelope to Horizon.
+  const sendXlmDemo = useCallback(async () => {
+    if (!state.session) return;
+    setSendBusy('building');
+    setActionError(null);
+    setSendResult(null);
+    try {
+      const info = await fetchAccountInfo(state.session.address);
+      const target = recipient.trim() || state.session.address;
+      const xdr = await buildPaymentXdr(info.address, info.sequence, target, amount.trim());
+
+      setSendBusy('signing');
+      const signed = await client.signTransaction(xdr);
+
+      setSendBusy('submitting');
+      const result = await submitSignedTx(signed.signedTxXdr);
+      setSendResult(result);
+      void loadBalance();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSendBusy(null);
+    }
+  }, [client, state.session, recipient, amount, loadBalance]);
+
+  const fundDemo = useCallback(async () => {
+    if (!state.session) return;
+    setFundBusy(true);
+    setFundMessage(null);
+    try {
+      await fundTestnetAccount(state.session.address);
+      setFundMessage('Funding requested — the balance updates within a few seconds.');
+      setTimeout(() => void loadBalance(), 2000);
+      setTimeout(() => void loadBalance(), 5000);
+    } catch (err) {
+      setFundMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFundBusy(false);
+    }
+  }, [state.session, loadBalance]);
+
+  const siwsSignOut = useCallback(async () => {
+    await client.signOut();
+    setSiwsSession(null);
+  }, [client]);
+
   const disconnect = useCallback(async () => {
     setSignOutput(null);
     setBalance(null);
     setBalanceError(null);
     setActionError(null);
+    setSendResult(null);
     await client.disconnect();
   }, [client]);
 
@@ -177,7 +268,7 @@ export function HomeScreen() {
             WalletConnect pairing is not configured
           </BodyText>
           <MutedText theme={theme}>
-            The demo runs end-to-end with Albedo right now. To pair Freighter, LOBSTR, HOT Wallet or
+            The demo runs end-to-end with Albedo and xBull right now. To pair Freighter, LOBSTR, HOT Wallet or
             Scopuly over the WalletConnect relay, put a free project id from cloud.walletconnect.com into{' '}
             <MonoText theme={theme}>EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID</MonoText> (.env) and restart the
             dev server.
@@ -255,22 +346,46 @@ export function HomeScreen() {
           </BodyText>
           <MutedText theme={theme}>
             Tap connect to open the AppKit bottom sheet. With WalletConnect configured: Freighter, LOBSTR,
-            HOT Wallet and Scopuly open straight from deep links, other wallets pair by QR, and Albedo runs
-            in an in-app WebView.
+            HOT Wallet and Scopuly open straight from deep links, other wallets pair by QR, and Albedo + xBull
+            run in an in-app WebView.
           </MutedText>
           <Button theme={theme} label="Connect Wallet" onPress={openModal} />
         </Card>
       )}
 
-      {/* signing demos */}
+      {/* language — every locale the core i18n module ships */}
+      <Card theme={theme}>
+        <BodyText theme={theme} style={{ fontWeight: '700' }}>
+          Language
+        </BodyText>
+        <MutedText theme={theme}>
+          All 25 translations from the core i18n module — the modal (wallet list, preview, account view,
+          SIWS screens) switches instantly, exactly like the web SDK. Your device language is applied at
+          startup.
+        </MutedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+          {LOCALES.map((option) => (
+            <Chip
+              key={option.code}
+              theme={theme}
+              label={option.label}
+              active={locale === option.code}
+              accent={theme.colorAccent}
+              onPress={() => void setAppLocale(option.code)}
+            />
+          ))}
+        </View>
+      </Card>
+
+      {/* signing demos — both flow through the modal's transaction preview */}
       {connected && (
         <Card theme={theme}>
           <BodyText theme={theme} style={{ fontWeight: '700' }}>
-            Try it
+            Sign
           </BodyText>
           <MutedText theme={theme}>
-            Both actions route through AppKit&apos;s sign queue — the wallet you connected with will ask
-            you to approve. For deep-link pairings, the modal offers to reopen the wallet app.
+            Both actions open the modal&apos;s preview first — decoded operations, risk flags and the fee,
+            just like the web SDK. Approve it and your wallet asks for the signature.
           </MutedText>
           <Button
             theme={theme}
@@ -304,6 +419,124 @@ export function HomeScreen() {
               ))}
             </View>
           ) : null}
+        </Card>
+      )}
+
+      {/* send XLM — build, preview, sign, SUBMIT to Testnet */}
+      {connected && (
+        <Card theme={theme}>
+          <BodyText theme={theme} style={{ fontWeight: '700' }}>
+            Send XLM (sign + submit)
+          </BodyText>
+          <MutedText theme={theme}>
+            Builds a real payment, signs it through the modal preview, then submits it to Horizon Testnet —
+            the recipient actually receives the XLM. Empty recipient = send to yourself. Need funds? Use
+            the faucet below.
+          </MutedText>
+          <Field
+            theme={theme}
+            label={`Recipient (defaults to yourself)`}
+            value={recipient}
+            onChangeText={setRecipient}
+            placeholder={`G… (your address)`}
+            mono
+          />
+          <Field
+            theme={theme}
+            label="Amount (XLM)"
+            value={amount}
+            onChangeText={setAmount}
+            placeholder="1"
+            keyboardType="decimal-pad"
+          />
+          <Button
+            theme={theme}
+            label={
+              sendBusy === 'building'
+                ? 'Loading account…'
+                : sendBusy === 'signing'
+                  ? 'Check the preview / your wallet…'
+                  : sendBusy === 'submitting'
+                    ? 'Submitting to Testnet…'
+                    : 'Send XLM'
+            }
+            busy={sendBusy !== null}
+            disabled={busy !== null}
+            onPress={sendXlmDemo}
+          />
+          {sendResult ? (
+            <View style={{ gap: 6 }}>
+              <MutedText theme={theme}>Transaction submitted</MutedText>
+              <MonoText theme={theme}>{sendResult.hash}</MonoText>
+              <MutedText
+                theme={theme}
+                style={{ color: theme.colorAccent, fontWeight: '600' }}
+                onPress={() => void Linking.openURL(sendResult.explorerUrl)}
+              >
+                View on the explorer →
+              </MutedText>
+            </View>
+          ) : null}
+        </Card>
+      )}
+
+      {/* SIWS — Sign-In With Stellar */}
+      <Card theme={theme}>
+        <BodyText theme={theme} style={{ fontWeight: '700' }}>
+          SIWS — Sign-In With Stellar
+        </BodyText>
+        <MutedText theme={theme}>
+          Wallet-based sign-in: after connecting, the modal runs the sign-in flow (checking session → nonce
+          → approve in wallet → verifying) and the signature is verified with the real{' '}
+          <MonoText theme={theme}>siws-verify</MonoText> package running as an on-device server. Production
+          apps move session/nonce/verify to a backend.
+        </MutedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+          <Chip
+            theme={theme}
+            label="SIWS enabled"
+            active={siwsEnabled}
+            accent={theme.colorAccent}
+            onPress={() => setSiwsEnabled(!siwsEnabled)}
+          />
+        </View>
+        {siwsEnabled ? (
+          connected ? (
+            siwsSession ? (
+              <View style={{ gap: 6 }}>
+                <Row theme={theme} label="Signed in as" value={shortAddress(siwsSession.address, 8)} />
+                <Row
+                  theme={theme}
+                  label="Session expires"
+                  value={new Date(siwsSession.expiry).toLocaleTimeString('en-US')}
+                  danger={siwsSession.expiry < Date.now()}
+                />
+                <Button theme={theme} label="Sign out" tone="danger" onPress={siwsSignOut} />
+              </View>
+            ) : (
+              <MutedText theme={theme}>
+                Not signed in yet — open the modal and reconnect (or disconnect and connect again) to run
+                the sign-in flow.
+              </MutedText>
+            )
+          ) : (
+            <MutedText theme={theme}>Connect a wallet to sign in.</MutedText>
+          )
+        ) : null}
+      </Card>
+
+      {/* testnet funds — friendbot faucet */}
+      {connected && (
+        <Card theme={theme}>
+          <BodyText theme={theme} style={{ fontWeight: '700' }}>
+            Testnet funds
+          </BodyText>
+          <MutedText theme={theme}>
+            The friendbot faucet credits your address with 10,000 test XLM — the same button the modal&apos;s
+            account view shows (Get Testnet funds). One tap per account.
+          </MutedText>
+          <Button theme={theme} label="Get Testnet funds" tone="secondary" busy={fundBusy} onPress={fundDemo} />
+          {fundMessage ? <MutedText theme={theme}>{fundMessage}</MutedText> : null}
         </Card>
       )}
 

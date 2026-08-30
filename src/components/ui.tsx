@@ -12,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type StyleProp,
   type TextStyle,
@@ -275,6 +276,54 @@ export function Row({
       >
         {value}
       </Text>
+    </View>
+  );
+}
+
+/** Themed label + single-line input (send-XLM recipient / amount fields). */
+export function Field({
+  theme,
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  mono,
+  keyboardType,
+}: {
+  theme: ConnectThemeRN;
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  mono?: boolean;
+  keyboardType?: 'default' | 'decimal-pad';
+}) {
+  return (
+    <View style={{ gap: 6 }}>
+      <MutedText theme={theme} style={{ fontWeight: '600' }}>
+        {label}
+      </MutedText>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={theme.colorTextMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
+        keyboardType={keyboardType ?? 'default'}
+        style={{
+          color: theme.colorText,
+          fontSize: 14,
+          fontFamily: mono ? 'monospace' : undefined,
+          backgroundColor: theme.colorBg,
+          borderColor: theme.colorBorder,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderRadius: theme.radiusSm,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      />
     </View>
   );
 }

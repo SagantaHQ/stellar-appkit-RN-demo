@@ -5,10 +5,12 @@
  * orchestrator (./AppKitModal.tsx) can import them without a circular
  * dependency on the component file.
  */
-/** i18n key for each view's sheet-header title (connecting/signing keep the wallet name). */
+/** i18n key for each view's sheet-header title (connecting/signing/preview
+ * keep their own in-view titles — web shows the wallet name / preview title). */
 export const VIEW_TITLES = {
     list: 'title.connect_wallet',
     account: 'title.account',
+    preview: 'title.review_transaction',
     error: 'error.title',
     'network-mismatch': 'title.wrong_network',
     'siws-checking': 'siws.title',

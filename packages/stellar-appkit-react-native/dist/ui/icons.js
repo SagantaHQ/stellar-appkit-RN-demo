@@ -46,6 +46,79 @@ export function ExternalLinkIcon({ color, size = 16 }) {
     return (_jsxs(View, { style: { width: size, height: size }, children: [_jsx(Bar, { x1: 8, y1: 5, x2: 15, y2: 5, color: color, width: 1.5, scale: s }), _jsx(Bar, { x1: 15, y1: 5, x2: 15, y2: 12, color: color, width: 1.5, scale: s }), _jsx(Bar, { x1: 15, y1: 5, x2: 6, y2: 14, color: color, width: 1.5, scale: s })] }));
 }
 /**
+ * icons.copy — web: `<rect x="7" y="7" width="9" height="9" rx="1.5"/>`
+ * + `M13 7V5.5C13 4.67 12.33 4 11.5 4H5.5C4.67 4 4 4.67 4 5.5V11.5
+ * C4 12.33 4.67 13 5.5 13H7` (front sheet + back sheet bracket).
+ */
+export function CopyIcon({ color, size = 16 }) {
+    const s = scaleFor(size);
+    const sw = 1.5 * s;
+    // Front sheet — stroked 9×9 rounded rect at (7,7).
+    const front = (_jsx(View, { style: {
+            position: 'absolute',
+            left: 7 * s,
+            top: 7 * s,
+            width: 9 * s,
+            height: 9 * s,
+            borderRadius: 1.5 * s,
+            borderWidth: sw,
+            borderColor: color,
+        } }));
+    // Back sheet — the three visible bracket edges (top, left, bottom-left curve).
+    const back = (_jsx(View, { style: {
+            position: 'absolute',
+            left: 4 * s,
+            top: 4 * s,
+            width: 9 * s,
+            height: 9 * s,
+            borderRadius: 1.5 * s,
+            borderWidth: sw,
+            borderColor: color,
+            // Only the left half of the bracket shows on the web icon — mask the
+            // right edge by shifting it under the front sheet visually (the front
+            // sheet is drawn after, overlapping it), and clip the top/right run.
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+            borderRightWidth: 0,
+        } }));
+    return (_jsxs(View, { style: { width: size, height: size }, children: [back, front] }));
+}
+/**
+ * icons.logOut — web: `M8 4H5.5C4.67 4 4 4.67 4 5.5V14.5C4 15.33 4.67 16
+ * 5.5 16H8` (door bracket) + `M13 13.5L16.5 10L13 6.5` (arrowhead)
+ * + `M16 10H8` (arrow shaft).
+ */
+export function LogOutIcon({ color, size = 16 }) {
+    const s = scaleFor(size);
+    const sw = 1.5 * s;
+    return (_jsxs(View, { style: { width: size, height: size }, children: [_jsx(View, { style: {
+                    position: 'absolute',
+                    left: 4 * s,
+                    top: 4 * s,
+                    width: 4 * s,
+                    height: 12 * s,
+                    borderWidth: sw,
+                    borderColor: color,
+                    borderTopLeftRadius: 1.5 * s,
+                    borderBottomLeftRadius: 1.5 * s,
+                    borderRightWidth: 0,
+                } }), _jsx(Bar, { x1: 13, y1: 13.5, x2: 16.5, y2: 10, color: color, width: 1.5, scale: s }), _jsx(Bar, { x1: 16.5, y1: 10, x2: 13, y2: 6.5, color: color, width: 1.5, scale: s }), _jsx(Bar, { x1: 16, y1: 10, x2: 8, y2: 10, color: color, width: 1.5, scale: s })] }));
+}
+/** The overflow "⋯" glyph (web renders three inline SVG circles at 20×20). */
+export function MoreDotsIcon({ color, size = 16 }) {
+    const s = scaleFor(size);
+    const d = 2 * s;
+    return (_jsx(View, { style: { width: size, height: size, alignItems: 'center', justifyContent: 'center' }, children: [4, 10, 16].map((x) => (_jsx(View, { style: {
+                position: 'absolute',
+                left: x * s - d / 2,
+                top: 10 * s - d / 2,
+                width: d,
+                height: d,
+                borderRadius: d / 2,
+                backgroundColor: color,
+            } }, x))) }));
+}
+/**
  * icons.alertCircle — ring + stem + dot (error / network-mismatch views).
  * Web: `<circle cx="10" cy="10" r="7"/>` + `M10 6.5V10.5` + filled r=0.9 dot.
  */

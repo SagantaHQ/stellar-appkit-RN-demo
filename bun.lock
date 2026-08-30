@@ -9,6 +9,7 @@
         "@react-native-async-storage/async-storage": "2.2.0",
         "@saganta/stellar-appkit": "file:packages/stellar-appkit",
         "@saganta/stellar-appkit-react-native": "file:packages/stellar-appkit-react-native",
+        "@saganta/stellar-appkit-siws-verify": "file:packages/stellar-appkit-siws-verify",
         "@stellar/stellar-sdk": "^13.0.0",
         "@walletconnect/react-native-compat": "2.23.10",
         "buffer": "^6.0.3",
@@ -366,6 +367,8 @@
     "@saganta/stellar-appkit": ["@saganta/stellar-appkit@file:packages/stellar-appkit", { "dependencies": { "@albedo-link/intent": "^0.13.0", "@creit.tech/xbull-wallet-connect": "^0.4.0", "@hot-wallet/sdk": "^1.0.11", "@ledgerhq/hw-app-str": "^7.7.7", "@ledgerhq/hw-transport": "^6.0.0", "@ledgerhq/hw-transport-webhid": "^6.36.0", "@ledgerhq/hw-transport-webusb": "^6.35.0", "@stellar/freighter-api": "^4.1.0", "@stellar/stellar-sdk": "^13.0.0", "@walletconnect/sign-client": "^2.0.0", "intl-messageformat": "^11.2.13", "js-sha256": "^0.11.0" } }],
 
     "@saganta/stellar-appkit-react-native": ["@saganta/stellar-appkit-react-native@file:packages/stellar-appkit-react-native", { "dependencies": { "@saganta/stellar-appkit": "file:../stellar-appkit" } }],
+
+    "@saganta/stellar-appkit-siws-verify": ["@saganta/stellar-appkit-siws-verify@file:packages/stellar-appkit-siws-verify", { "dependencies": { "@saganta/stellar-appkit": "file:../stellar-appkit", "@stellar/stellar-sdk": "^13.0.0" } }],
 
     "@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
 
@@ -1454,6 +1457,8 @@
     "@react-native/metro-config/metro-runtime": ["metro-runtime@0.87.0", "", { "dependencies": { "@babel/runtime": "^7.25.0", "flow-enums-runtime": "^0.0.6" } }, "sha512-XsXZkgEwI0ZMYSBfvOMAbenzwa60XlObXJ27g6/Khgrz9ESbiBbAsd7hR62G2jRBYOhGAzG61Gk22dpRJj/mdw=="],
 
     "@saganta/stellar-appkit-react-native/@saganta/stellar-appkit": ["@saganta/stellar-appkit@file:packages/stellar-appkit", { "dependencies": { "@albedo-link/intent": "^0.13.0", "@creit.tech/xbull-wallet-connect": "^0.4.0", "@hot-wallet/sdk": "^1.0.11", "@ledgerhq/hw-app-str": "^7.7.7", "@ledgerhq/hw-transport": "^6.0.0", "@ledgerhq/hw-transport-webhid": "^6.36.0", "@ledgerhq/hw-transport-webusb": "^6.35.0", "@stellar/freighter-api": "^4.1.0", "@stellar/stellar-sdk": "^13.0.0", "@walletconnect/sign-client": "^2.0.0", "intl-messageformat": "^11.2.13", "js-sha256": "^0.11.0" } }],
+
+    "@saganta/stellar-appkit-siws-verify/@saganta/stellar-appkit": ["@saganta/stellar-appkit@file:packages/stellar-appkit", {}],
 
     "@scure/bip32/@noble/curves": ["@noble/curves@1.9.7", "", { "dependencies": { "@noble/hashes": "1.8.0" } }, "sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw=="],
 

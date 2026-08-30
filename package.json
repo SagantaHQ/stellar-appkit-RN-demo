@@ -18,6 +18,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@saganta/stellar-appkit": "file:packages/stellar-appkit",
     "@saganta/stellar-appkit-react-native": "file:packages/stellar-appkit-react-native",
+    "@saganta/stellar-appkit-siws-verify": "file:packages/stellar-appkit-siws-verify",
     "@stellar/stellar-sdk": "^13.0.0",
     "@walletconnect/react-native-compat": "2.23.10",
     "buffer": "^6.0.3",

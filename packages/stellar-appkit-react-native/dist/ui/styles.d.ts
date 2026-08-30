@@ -386,27 +386,430 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         fontSize: number;
         fontWeight: "600";
     };
-    accountCard: {
+    accountHeader: {
         flexDirection: "row";
         alignItems: "center";
         gap: number;
-        backgroundColor: string;
-        borderRadius: number;
-        padding: number;
+        paddingVertical: number;
     };
-    walletMeta: {
+    accountAvatar: {
+        width: number;
+        height: number;
+        borderRadius: number;
+        overflow: "hidden";
+        alignItems: "center";
+        justifyContent: "center";
+        flexShrink: number;
+    };
+    accountInfo: {
         flex: number;
+        minWidth: number;
+    };
+    accountAddressRow: {
+        flexDirection: "row";
+        alignItems: "center";
         gap: number;
     };
-    addressText: {
+    accountAddress: {
         color: string;
         fontSize: number;
+        fontWeight: "500";
         letterSpacing: number;
+        fontFamily: string | undefined;
     };
-    danger: {
+    accountCopyIcon: {
+        opacity: number;
+    };
+    accountMeta: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        marginTop: number;
+    };
+    networkPill: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        backgroundColor: string;
+    };
+    networkPillText: {
+        color: string;
+        fontSize: number;
+        textTransform: "capitalize";
+    };
+    networkDot: {
+        width: number;
+        height: number;
+        borderRadius: number;
+    };
+    explorerButton: {
+        padding: number;
+        opacity: number;
+    };
+    overflowMenu: {
+        gap: number;
+        padding: number;
+        borderRadius: number;
+        backgroundColor: string;
+        borderWidth: number;
+        borderColor: string;
+        marginBottom: number;
+    };
+    overflowItem: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        paddingVertical: number;
+        paddingHorizontal: number;
+        borderRadius: number;
+    };
+    overflowItemPressed: {
+        backgroundColor: string;
+        opacity: number;
+    };
+    overflowItemText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+    };
+    overflowDangerText: {
+        color: string;
+    };
+    pendingBanner: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        backgroundColor: string;
+        borderWidth: number;
+        borderColor: string;
+        marginBottom: number;
+    };
+    pendingBannerText: {
+        color: string;
+        fontSize: number;
+        flex: number;
+    };
+    balanceSection: {
+        paddingHorizontal: number;
+    };
+    balanceLabel: {
+        color: string;
+        fontSize: number;
+        fontWeight: "600";
+        letterSpacing: number;
+        textTransform: "uppercase";
+        marginBottom: number;
+    };
+    balanceAmount: {
+        flexDirection: "row";
+        alignItems: "baseline";
+        gap: number;
+    };
+    balanceValue: {
+        color: string;
+        fontSize: number;
+        fontWeight: "700";
+        letterSpacing: number;
+        fontFamily: string | undefined;
+    };
+    balanceUnit: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+    };
+    balanceSkeleton: {
+        width: number;
+        height: number;
+        borderRadius: number;
+        backgroundColor: string;
+    };
+    friendbotButton: {
+        alignSelf: "flex-start";
+        paddingHorizontal: number;
+        paddingVertical: number;
+        marginTop: number;
+        borderRadius: number;
+        borderWidth: number;
+        borderColor: string;
+        backgroundColor: string;
+    };
+    friendbotButtonPressed: {
+        opacity: number;
+    };
+    friendbotButtonText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+    };
+    fundsBanner: {
+        marginTop: number;
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        borderLeftWidth: number;
+        borderLeftColor: string;
+        backgroundColor: string;
+    };
+    fundsBannerText: {
+        color: string;
+        fontSize: number;
+        lineHeight: number;
+    };
+    txHistory: {
+        gap: number;
+    };
+    txHeader: {
+        color: string;
+        fontSize: number;
+        fontWeight: "600";
+        letterSpacing: number;
+        textTransform: "uppercase";
+        paddingTop: number;
+        paddingBottom: number;
+    };
+    txRow: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+        paddingVertical: number;
+        paddingHorizontal: number;
+        borderBottomWidth: number;
+        borderBottomColor: string;
+    };
+    txIcon: {
+        width: number;
+        height: number;
+        borderRadius: number;
+        alignItems: "center";
+        justifyContent: "center";
+        flexShrink: number;
+    };
+    txIconSuccess: {
+        backgroundColor: string;
+    };
+    txIconFailed: {
+        backgroundColor: string;
+    };
+    txIconTextSuccess: {
+        color: string;
+        fontSize: number;
+        fontWeight: "700";
+    };
+    txIconTextFailed: {
+        color: string;
+        fontSize: number;
+        fontWeight: "700";
+    };
+    txInfo: {
+        flex: number;
+        minWidth: number;
+    };
+    txType: {
+        color: string;
+        fontSize: number;
+        fontWeight: "500";
+        textTransform: "capitalize";
+    };
+    txDate: {
         color: string;
         fontSize: number;
         marginTop: number;
+    };
+    txAmount: {
+        fontSize: number;
+        fontWeight: "500";
+        fontFamily: string | undefined;
+    };
+    txAmountIn: {
+        color: string;
+    };
+    txAmountOut: {
+        color: string;
+    };
+    txEmpty: {
+        color: string;
+        fontSize: number;
+        textAlign: "center";
+        paddingVertical: number;
+    };
+    preview: {
+        paddingHorizontal: number;
+        paddingTop: number;
+        paddingBottom: number;
+        alignItems: "center";
+    };
+    previewThumbs: {
+        flexDirection: "row";
+        alignItems: "center";
+        paddingTop: number;
+        paddingBottom: number;
+    };
+    previewThumb: {
+        width: number;
+        height: number;
+        borderRadius: number;
+        alignItems: "center";
+        justifyContent: "center";
+        overflow: "hidden";
+        flexShrink: number;
+        backgroundColor: string;
+        borderWidth: number;
+        borderColor: string;
+    };
+    previewThumbImg: {
+        width: number;
+        height: number;
+        borderRadius: number;
+        overflow: "hidden";
+    };
+    previewThumbLetter: {
+        color: string;
+        fontSize: number;
+        fontWeight: "700";
+    };
+    previewThumbConnector: {
+        width: number;
+        height: number;
+        backgroundColor: string;
+        flexShrink: number;
+    };
+    previewTitle: {
+        color: string;
+        fontSize: number;
+        fontWeight: "600";
+        letterSpacing: number;
+        lineHeight: number;
+        textAlign: "center";
+        marginBottom: number;
+    };
+    previewSubtitle: {
+        color: string;
+        fontSize: number;
+        lineHeight: number;
+        textAlign: "center";
+        maxWidth: number;
+        marginBottom: number;
+    };
+    previewOps: {
+        gap: number;
+        alignSelf: "stretch";
+        marginBottom: number;
+    };
+    previewOp: {
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        backgroundColor: string;
+        borderWidth: number;
+        borderColor: string;
+    };
+    previewOpSummary: {
+        color: string;
+        fontSize: number;
+        lineHeight: number;
+    };
+    riskFlag: {
+        marginTop: number;
+        paddingHorizontal: number;
+        paddingVertical: number;
+        borderRadius: number;
+        borderWidth: number;
+    };
+    riskInfo: {
+        color: string;
+        backgroundColor: string;
+        borderColor: string;
+    };
+    riskWarning: {
+        color: string;
+        backgroundColor: string;
+        borderColor: string;
+    };
+    riskDanger: {
+        color: string;
+        backgroundColor: string;
+        borderColor: string;
+    };
+    riskFlagText: {
+        fontSize: number;
+        lineHeight: number;
+    };
+    previewMeta: {
+        flexDirection: "row";
+        justifyContent: "space-between";
+        alignItems: "center";
+        gap: number;
+        paddingHorizontal: number;
+        paddingTop: number;
+        marginTop: number;
+        borderTopWidth: number;
+        borderTopColor: string;
+        alignSelf: "stretch";
+    };
+    previewMetaItem: {
+        flexDirection: "row";
+        alignItems: "center";
+        gap: number;
+    };
+    previewMetaText: {
+        color: string;
+        fontSize: number;
+        fontFamily: string | undefined;
+    };
+    previewFee: {
+        color: string;
+        fontWeight: "500";
+    };
+    previewActions: {
+        flexDirection: "row";
+        gap: number;
+        marginTop: number;
+        alignSelf: "stretch";
+    };
+    previewBtnCancel: {
+        flex: number;
+        paddingVertical: number;
+        paddingHorizontal: number;
+        borderRadius: number;
+        borderWidth: number;
+        borderColor: string;
+        alignItems: "center";
+    };
+    previewBtnCancelPressed: {
+        backgroundColor: string;
+        transform: {
+            scale: number;
+        }[];
+    };
+    previewBtnCancelText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "600";
+    };
+    previewBtnApprove: {
+        flex: number;
+        paddingVertical: number;
+        paddingHorizontal: number;
+        borderRadius: number;
+        backgroundColor: string;
+        alignItems: "center";
+    };
+    previewBtnApprovePressed: {
+        opacity: number;
+        transform: {
+            scale: number;
+        }[];
+    };
+    previewBtnApproveText: {
+        color: string;
+        fontSize: number;
+        fontWeight: "600";
     };
     errorState: {
         alignItems: "center";

@@ -1,0 +1,35 @@
+{
+  "name": "@saganta/stellar-appkit-siws-verify",
+  "version": "1.9.56",
+  "description": "Server-side SIWS signature/envelope verification.",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@saganta/stellar-appkit": "file:../stellar-appkit",
+    "@stellar/stellar-sdk": "^13.0.0"
+  },
+  "license": "MIT",
+  "homepage": "https://stellar-appkit.saganta.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sagantaHQ/stellar-appkit.git",
+    "directory": "packages/siws-verify"
+  },
+  "bugs": {
+    "url": "https://github.com/sagantaHQ/stellar-appkit/issues"
+  },
+  "private": true
+}

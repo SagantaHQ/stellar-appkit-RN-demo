@@ -39,8 +39,16 @@ export declare function useSpinner(reducedMotion: boolean): Animated.Value;
  * `animation: none; opacity: 1`).
  *
  * Returns one style per child index 0..count-1.
+ *
+ * `opts.stepMs` / `opts.maxDelaySteps` retune the cascade for views with
+ * different web timings — e.g. the transaction preview staggers all seven
+ * children 60ms apart (`.preview > *:nth-child(n)`), so it passes
+ * `{ stepMs: 60, maxDelaySteps: count }`.
  */
-export declare function useEntranceStagger(count: number, reducedMotion: boolean): Array<{
+export declare function useEntranceStagger(count: number, reducedMotion: boolean, opts?: {
+    stepMs?: number;
+    maxDelaySteps?: number;
+}): Array<{
     opacity: Animated.Value;
     translateY: Animated.Value;
 }>;
