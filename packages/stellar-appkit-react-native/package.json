@@ -32,57 +32,15 @@
     "README.md"
   ],
   "sideEffects": false,
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "bun test"
-  },
   "dependencies": {
     "@saganta/stellar-appkit": "file:../stellar-appkit",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1"
   },
-  "peerDependencies": {
-    "@gorhom/bottom-sheet": ">=4",
-    "@react-native-async-storage/async-storage": ">=1",
-    "@walletconnect/react-native-compat": ">=2",
-    "buffer": ">=6",
-    "react": ">=18",
-    "react-native": ">=0.73",
-    "react-native-get-random-values": ">=1.11",
-    "react-native-webview": ">=13"
-  },
-  "peerDependenciesMeta": {
-    "@gorhom/bottom-sheet": {
-      "optional": true
-    },
-    "@react-native-async-storage/async-storage": {
-      "optional": true
-    },
-    "@walletconnect/react-native-compat": {
-      "optional": true
-    },
-    "buffer": {
-      "optional": true
-    },
-    "react-native-get-random-values": {
-      "optional": true
-    },
-    "react-native-webview": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@types/react": "^19.0.0",
-    "react": "^19.0.0",
-    "react-native": "^0.78.0",
-    "@gorhom/bottom-sheet": "^5.0.0",
-    "react-native-webview": "^13.0.0",
-    "@react-native-async-storage/async-storage": "^2.0.0"
-  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/SagantaHQ/stellar-appkit"
-  }
+  },
+  "private": true
 }

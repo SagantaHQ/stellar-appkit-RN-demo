@@ -61,7 +61,8 @@ which requires a project id:
 - **Connect flow** — `AppKitModal` (a `@gorhom/bottom-sheet`) with a web-parity wallet list
   (flat rounded rows, 40dp squircle tiles with drop shadow, "Installed" outline badges, accent
   Install pills): the featured Stellar wallets (tap Freighter / LOBSTR / HOT Wallet / Scopuly →
-  deep link `freighterwallet://wc?uri=…` etc., with universal-link and store fallbacks) plus
+  deep link `freighterwallet://wc-redirect/wc?uri=…` etc. — each wallet's Explorer-registered
+  native link, with universal-link and store fallbacks) plus
   every other WalletConnect-registered mobile wallet under a collapsible "More wallets"
   section, and the Albedo WebView screen. Pairing is deep-link only — on a phone the same
   device would have to scan a QR code, so the modal never shows one. The connecting and
@@ -215,6 +216,7 @@ Notes:
 | `crypto.getRandomValues` errors | Make sure `./src/polyfills` is imported before anything else in `index.ts`. |
 | WalletConnect pairing says "Project not found" / code 3000 | Wrong/missing `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` — fix `.env` and fully restart the dev server. |
 | Freighter button says the wallet isn't installed | Install [Freighter Mobile](https://freighter.app) (iOS App Store / Google Play) and try again. |
+| Freighter opens but never shows the connection prompt (the app just sits there) | **Fixed in this repo.** Freighter Mobile's deep-link handler silently ignores any URL that doesn't contain its Reown-registered native redirect — `freighterwallet://wc-redirect` (its `mobile.native` entry in the WalletConnect Explorer). The old link (`freighterwallet://wc?uri=…`, shaped after the dev-scheme links in the freighter-mobile repo) opens the app — the OS only matches the scheme — and is then dropped: no pairing, no prompt. The registry now uses the registered link, so the built deep link is `freighterwallet://wc-redirect/wc?uri=…`, byte-identical to what WalletConnect's own modal opens for Freighter. If you still see it after `git pull && bun install && bunx expo start --clear`: check the Freighter app is unlocked/onboarded, and that its active network matches the demo's (TESTNET) — a network mismatch surfaces as a "wrong network" toast on approve. |
 | "Account not found on TESTNET" | Your address was never funded on testnet — create a fresh account in your wallet (testnet mode) or fund it via [friendbot](https://friendbot.stellar.org). |
 | Expo Go says the SDK is unsupported | Update the Expo Go app on your phone to the latest version (SDK 57). |
 | `TurboModuleRegistry.getEnforcing('PlatformConstants') could not be found` | A second `react-native` got installed into the tree (bun nesting the vendored package's old devDependencies/peers). Run `rm -rf node_modules packages/stellar-appkit-react-native/node_modules bun.lock package-lock.json && bun install`, then `bunx expo start --clear`. Fixed at the source in the sync script — see "Why `file:` packages?" |
