@@ -33,18 +33,22 @@ import React, {
   type ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
+import * as ExpoWebBrowser from 'expo-web-browser';
 import {
   StellarAppKit,
   applyDeviceLocale,
   createAlbedoWebViewConnector,
   createXBullWebViewConnector,
   createAsyncStorage,
+  createThemedBrowserSession,
   defaultReactNativeConnectors,
   setLocale,
   getLocale,
   onLocaleChange,
   type LocaleCode,
   type SiwsSession,
+  type ThemedBrowserSession,
 } from '@saganta/stellar-appkit-react-native';
 import { verifySiws } from '@saganta/stellar-appkit-siws-verify';
 import { createAlbedoWebViewBridge } from '@saganta/stellar-appkit-react-native/albedo';
@@ -142,6 +146,12 @@ interface AppKitDemoContextValue {
   /** SIWS toggle — rebuilding the client with/without the siws config. */
   siwsEnabled: boolean;
   setSiwsEnabled: (on: boolean) => void;
+  /**
+   * The themed in-app browser (Chrome Custom Tabs / SFSafariViewController,
+   * styled like a modal from the active theme). Passed to the modal so
+   * explorer/install/footer links open in-app, and usable directly.
+   */
+  browser: ThemedBrowserSession;
 }
 
 const AppKitDemoContext = createContext<AppKitDemoContextValue | null>(null);
@@ -288,6 +298,34 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
     [themeId]
   );
 
+  /**
+   * The themed system-browser session. Adapters are INJECTED (Metro
+   * resolves static requires at bundle time — the library can't require
+   * them itself):
+   * - react-native-inappbrowser-reborn — full modal styling + Chrome Tab
+   *   detection; its native module exists in dev-client/EAS builds (the
+   *   demo already ships expo-dev-client)
+   * - expo-web-browser — the same OS surfaces, bundled with Expo Go
+   * The session degrades at runtime: reborn throwing (no native module in
+   * Expo Go) falls straight to expo-web-browser, then to the external
+   * browser. Rebuilt per theme so switching themes restyles the chrome.
+   */
+  const browser = useMemo(
+    () =>
+      createThemedBrowserSession(
+        { reborn: InAppBrowser, expo: ExpoWebBrowser },
+        { theme }
+      ),
+    [theme]
+  );
+
+  // Pre-warm the system browser process (Chrome Custom Tabs / SFSafariVC)
+  // so the first themed open is instant — the browser analog of the
+  // WalletConnect warm-up. No-op when only the external fallback exists.
+  useEffect(() => {
+    void browser.warmup();
+  }, [browser]);
+
   const value = useMemo(
     () => ({
       client,
@@ -306,8 +344,9 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       setAppLocale,
       siwsEnabled,
       setSiwsEnabled,
+      browser,
     }),
-    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled]
+    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, browser]
   );
 
   return <AppKitDemoContext.Provider value={value}>{children}</AppKitDemoContext.Provider>;

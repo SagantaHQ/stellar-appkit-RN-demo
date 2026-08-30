@@ -112,6 +112,18 @@ which requires a project id:
   (Node's `crypto` is provided by `src/node-crypto-shim.js`, a `@noble/hashes`-backed
   createHash routed in `metro.config.js`). The session persists in `AsyncStorage` and
   the card shows the signed-in address + expiry with a Sign-out button.
+- **Themed in-app browser** — a new "In-app browser" card + every web link in the
+  modal (explorer, wallet install pages, the footer) opens in a themed Chrome Custom
+  Tab / SFSafariViewController — modal `pageSheet` on iOS, themed toolbars on Android —
+  instead of the heavy WebView. Preference chain: `react-native-inappbrowser-reborn`
+  (dev-client / EAS builds; full modal styling + `isAvailable()` Chrome Tab detection)
+  → `expo-web-browser` (bundled with Expo Go) → external browser. The card shows which
+  surface won on the device and whether Custom Tabs were detected. Why: the system
+  browser supports **passkeys** (WKWebView/Android WebView do not — verified against
+  Apple's and Chrome's own docs) and shares the browser's cookie jar, so a wallet
+  already unlocked in the user's browser stays unlocked. Albedo and xBull keep the
+  in-app WebView for their flows because their popup protocols are postMessage-coupled
+  to the opener window — a Custom Tab has no such channel back into the app.
 - **Friendbot faucet** — one-tap "Get Testnet funds" in the demo (and in the modal's
   account view) credits 10,000 test XLM.
 - **Theming** — all 10 modal themes (`minimal/stellar/sky/ocean/sunset` × dark/light) applied
@@ -127,11 +139,11 @@ The interesting files, in the order the app loads them:
 |---|---|
 | `index.ts` | Entry point — imports `./src/polyfills` **before** everything else. |
 | `src/polyfills.ts` | The Expo Go-safe polyfill dance (see below). |
-| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, the WalletConnect warm-up + session restore, theme + locale state, and the SIWS "server-in-your-pocket" config (nonce/session/verify/signout backed by AsyncStorage + `siws-verify`). |
+| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, the WalletConnect warm-up + session restore, theme + locale state, the SIWS "server-in-your-pocket" config (nonce/session/verify/signout backed by AsyncStorage + `siws-verify`), and the themed in-app browser session (`createThemedBrowserSession` with reborn + expo-web-browser injected, rebuilt per theme, pre-warmed at startup). |
 | `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` at the root. |
 | `src/stellar.ts` | Demo Stellar helpers — plain Horizon `fetch` for account/balance, stellar-sdk XDR builders, `submitSignedTx()` (REST submit), friendbot faucet, SIWS nonce (AppKit signs; building/submitting XDR is your app's job). |
 | `src/node-crypto-shim.js` | `createHash('sha256'/'sha512')` via `@noble/hashes` — stands in for Node's `crypto` so `siws-verify` runs on-device (routed in metro.config.js). |
-| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, sign (message + self-payment), send XLM (sign + submit), SIWS, friendbot, theme. |
+| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, sign (message + self-payment), send XLM (sign + submit), SIWS, in-app browser, friendbot, theme. |
 | `scripts/test-siws-e2e.mjs` | Node-run e2e proof of the SIWS verification path (valid sign-in, wrong nonce/domain, foreign signature, SEP-0053 hashed signing). |
 | `metro.config.js` | Five Expo Go-specific resolver tweaks (see below). |
 

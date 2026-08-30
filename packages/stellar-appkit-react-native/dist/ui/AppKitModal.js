@@ -87,7 +87,7 @@ import { SigningView } from './views/SigningView.js';
 import { SiwsView } from './views/SiwsView.js';
 import { AccountView } from './views/AccountView.js';
 import { ErrorView, NetworkMismatchView } from './views/ErrorView.js';
-export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode = 'bottomsheet', title, logo, }) {
+export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode = 'bottomsheet', title, logo, browser, }) {
     const state = useAppKit(client);
     const reducedMotion = useReducedMotion();
     const styles = useMemo(() => buildStyles(theme), [theme]);
@@ -445,6 +445,21 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode 
         setView('list');
         void refreshWallets();
     }, [client, refreshWallets]);
+    // --- themed browser handoffs (http(s) only) --------------------------------
+    /**
+     * Opens a web URL in the themed in-app browser when the modal was given
+     * one (Chrome Custom Tab / SFSafariViewController, themed from the active
+     * theme, modal pageSheet on iOS) — otherwise the external browser via
+     * `Linking`, exactly like before. Custom-scheme wallet deep links never
+     * route through here: Custom Tabs only handle web URLs.
+     */
+    const openHttpUrl = useCallback((url) => {
+        if (browser) {
+            void browser.open(url).catch(() => undefined);
+            return;
+        }
+        void Linking.openURL(url).catch(() => undefined);
+    }, [browser]);
     // --- account view actions (web connected-view handlers) ---------------------
     /** Address tap → share sheet (the RN copy surface) + check feedback. */
     const copyAddress = useCallback(async (address) => {
@@ -474,11 +489,11 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode 
     const switchWallet = useCallback(() => {
         setView('list');
     }, []);
-    /** Tx row / explorer link — opens the external explorer. */
+    /** Tx row / explorer link — opens the external explorer (themed tab when available). */
     const openExplorer = useCallback((path) => {
         const network = client.session?.network ?? 'TESTNET';
-        void Linking.openURL(explorerUrl(path, network));
-    }, [client]);
+        openHttpUrl(explorerUrl(path, network));
+    }, [client, openHttpUrl]);
     const openTxExplorer = useCallback((tx) => openExplorer(`tx/${tx.hash}`), [openExplorer]);
     /** Sheet dismissal — web close(): SIWS that never succeeded disconnects (disconnectOnFail). */
     const handleClose = useCallback(() => {
@@ -503,19 +518,19 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode 
     const headerTitle = title ?? (VIEW_TITLES[view] ? t(VIEW_TITLES[view]) : t('title.connect_wallet'));
     const isConnectedHeader = view === 'account' && state.session !== null;
     const header = (_jsx(HeaderView, { styles: styles, theme: theme, showClose: mode !== 'inline', onClose: handleClose, onBack: cancelConnecting, backWalletName: backWalletName, connectedWalletName: isConnectedHeader ? state.walletName ?? t('wallet.fallback_name') : null, connectedWalletIcon: state.walletIcon, connectedWalletKey: connectingWallet?.key ?? null, title: headerTitle, logo: logo }));
-    const footer = (_jsx(Pressable, { style: styles.footer, onPress: () => void Linking.openURL('https://github.com/sagantaHQ/stellar-appkit'), accessibilityRole: "link", children: _jsxs(Text, { style: styles.footerText, children: [t('footer.powered_by', { brand: '' }), _jsx(Text, { style: styles.footerLink, children: t('footer.brand_name') })] }) }));
+    const footer = (_jsx(Pressable, { style: styles.footer, onPress: () => openHttpUrl('https://github.com/sagantaHQ/stellar-appkit'), accessibilityRole: "link", children: _jsxs(Text, { style: styles.footerText, children: [t('footer.powered_by', { brand: '' }), _jsx(Text, { style: styles.footerLink, children: t('footer.brand_name') })] }) }));
     const body = (_jsxs(_Fragment, { children: [view === 'list' && (_jsx(WalletListView, { styles: styles, theme: theme, loading: loadingWallets, rows: walletRows, showMobileWallets: Boolean(wcConnector), showMore: showMoreWallets, onToggleMore: () => setShowMoreWallets((v) => !v), onConnectMobile: connectMobileWallet, onConnectConnector: connectConnector, onInstall: (row) => {
                     const url = Platform.select({
                         ios: row.connector.meta.installUrl?.ios,
                         android: row.connector.meta.installUrl?.android,
                     });
                     if (url)
-                        void Linking.openURL(url);
+                        openHttpUrl(url);
                 } })), view === 'connecting' && (_jsx(ConnectingView, { styles: styles, theme: theme, reducedMotion: reducedMotion, walletName: connectingWallet?.name ?? state.walletName ?? t('wallet.fallback_your_wallet'), walletIcon: connectingWallet?.icon ?? state.walletIcon, walletKey: connectingWallet?.key ?? null, subtitle: connectingError ?? t('connecting.accept_request'), error: connectingError !== null, openFailed: openFailed, failedWalletName: pairedMobileWalletId.current ? getMobileWallet(pairedMobileWalletId.current)?.name : undefined, onInstallFailedWallet: () => {
                     const wallet = pairedMobileWalletId.current ? getMobileWallet(pairedMobileWalletId.current) : undefined;
                     const url = wallet && Platform.select({ ios: wallet.installUrl.ios, android: wallet.installUrl.android });
                     if (url)
-                        void Linking.openURL(url);
+                        openHttpUrl(url);
                 }, onRetryConnect: retryConnect, onRetryOpen: retryOpenWallet, onShareUri: wcUri && pairedMobileWalletId.current ? sharePairingUri : undefined, reopenWallet: pairedMobileWalletId.current && view === 'connecting' ? retryOpenWallet : undefined })), view === 'preview' && pendingPreview && (_jsx(PreviewView, { styles: styles, theme: theme, reducedMotion: reducedMotion, preview: pendingPreview.preview, walletName: state.walletName ?? t('wallet.fallback_name'), walletIcon: state.walletIcon, walletKey: connectingWallet?.key ?? pairedMobileWalletId.current, appName: client.appMetadata?.name ?? t('preview.default_app_name'), appLogo: logo ?? null, onApprove: approvePreview, onReject: rejectPreview, onCopyAddress: () => void copyAddress(pendingPreview.preview.sourceAccount), copied: copiedAddress })), view === 'signing' && (_jsx(SigningView, { styles: styles, theme: theme, reducedMotion: reducedMotion, walletName: state.walletName ?? t('wallet.fallback_your_wallet'), walletIcon: state.walletIcon, walletKey: connectingWallet?.key ?? pairedMobileWalletId.current, error: connectingError, onRetry: () => {
                     // Web retry-signing: re-show the approved preview so the user
                     // can approve again; without one, fall back to the account view.

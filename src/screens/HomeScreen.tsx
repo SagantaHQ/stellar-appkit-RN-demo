@@ -31,7 +31,7 @@ import {
 } from 'react-native';
 import { useAppKit, WalletIcon, AppKitModal } from '@saganta/stellar-appkit-react-native/ui';
 import type { SiwsSession } from '@saganta/stellar-appkit-react-native';
-import { DEMO_MESSAGE, DEMO_PAYMENT_AMOUNT } from '../constants';
+import { DEMO_MESSAGE, DEMO_PAYMENT_AMOUNT, DOCS_URL, LIBRARY_URL } from '../constants';
 import { LOCALES, THEMES, useAppKitDemo } from '../appkit';
 import {
   Badge,
@@ -75,6 +75,7 @@ export function HomeScreen() {
     setAppLocale,
     siwsEnabled,
     setSiwsEnabled,
+    browser,
   } = useAppKitDemo();
   const state = useAppKit(client);
 
@@ -95,6 +96,9 @@ export function HomeScreen() {
   const [fundBusy, setFundBusy] = useState(false);
   const [fundMessage, setFundMessage] = useState<string | null>(null);
   const wasPending = useRef(false);
+
+  // In-app browser detection state (the card shows which surface won).
+  const [chromeTabs, setChromeTabs] = useState<boolean | null>(null);
 
   const connected = state.status === 'connected' && state.session != null;
 
@@ -136,6 +140,25 @@ export function HomeScreen() {
     const off = client.on('siwsSessionChange', update);
     return off;
   }, [client]);
+
+  // ------------------------------------------------- in-app browser detection --
+  // Which system surface won on this device: reborn's Chrome Tab when the
+  // native module exists (dev-client / EAS builds), expo-web-browser's
+  // Custom Tabs in Expo Go, external browser as the last resort.
+  useEffect(() => {
+    let alive = true;
+    browser
+      .isChromeTabsAvailable()
+      .then((available) => {
+        if (alive) setChromeTabs(available);
+      })
+      .catch(() => {
+        if (alive) setChromeTabs(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [browser]);
 
   // ------------------------------------------------------------- actions ----
   const signMessageDemo = useCallback(async () => {
@@ -305,7 +328,7 @@ export function HomeScreen() {
 
       {/* inline presentation — the modal embedded in the page (web mode="inline") */}
       {presentation === 'inline' && (
-        <AppKitModal client={client} mode="inline" open onClose={() => {}} theme={theme} />
+        <AppKitModal client={client} mode="inline" open onClose={() => {}} theme={theme} browser={browser} />
       )}
 
       {/* session / connect */}
@@ -525,6 +548,54 @@ export function HomeScreen() {
         ) : null}
       </Card>
 
+      {/* in-app browser — themed Chrome Custom Tab / SFSafariViewController */}
+      <Card theme={theme}>
+        <BodyText theme={theme} style={{ fontWeight: '700' }}>
+          In-app browser
+        </BodyText>
+        <MutedText theme={theme}>
+          Web links (explorer, wallet install pages, the modal footer) open in a themed Chrome Custom Tab /
+          SFSafariViewController instead of the heavy WebView — the system browser supports passkeys, which
+          the WebView cannot, and shares the browser&apos;s wallet session. Preference chain:
+          react-native-inappbrowser-reborn (dev-client / EAS builds) → expo-web-browser (Expo Go) → external
+          browser. Albedo and xBull still use the in-app WebView because their popups talk postMessage to the
+          opener window — a Custom Tab has no such channel back into the app.
+        </MutedText>
+        <Row
+          theme={theme}
+          label="Preferred surface"
+          value={browser.surface === 'reborn' ? 'inappbrowser-reborn' : browser.surface === 'expo' ? 'expo-web-browser' : 'external browser'}
+        />
+        <Row
+          theme={theme}
+          label="Chrome Custom Tabs"
+          value={chromeTabs === null ? 'detecting…' : chromeTabs ? 'available' : 'not detected'}
+          danger={chromeTabs === false}
+        />
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              theme={theme}
+              label="Open the docs (themed)"
+              tone="secondary"
+              onPress={() => void browser.open(DOCS_URL)}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              theme={theme}
+              label="Open on GitHub"
+              tone="secondary"
+              onPress={() => void browser.open(LIBRARY_URL)}
+            />
+          </View>
+        </View>
+        <MutedText theme={theme}>
+          Also try the explorer links inside the modal&apos;s account view — they use the same themed tab, and
+          switching the theme below restyles it live.
+        </MutedText>
+      </Card>
+
       {/* testnet funds — friendbot faucet */}
       {connected && (
         <Card theme={theme}>
@@ -571,7 +642,7 @@ export function HomeScreen() {
           <MutedText
             theme={theme}
             style={{ color: theme.colorAccent }}
-            onPress={() => void Linking.openURL('https://github.com/SagantaHQ/stellar-appkit')}
+            onPress={() => void browser.open(LIBRARY_URL)}
           >
             Library
           </MutedText>

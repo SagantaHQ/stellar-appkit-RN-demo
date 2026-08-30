@@ -69,6 +69,7 @@
 import React from 'react';
 import type { ImageSourcePropType } from 'react-native';
 import type { StellarAppKit } from '@saganta/stellar-appkit';
+import type { ThemedBrowserSession } from '../browser/inapp-browser.js';
 import { type ConnectThemeRN } from './theme.js';
 export interface AppKitModalProps {
     client: StellarAppKit;
@@ -90,6 +91,20 @@ export interface AppKitModalProps {
     title?: string;
     /** Header logo (web `logo-src` attribute). 22×22, radius 6. */
     logo?: ImageSourcePropType;
+    /**
+     * Themed in-app browser for plain http(s) handoffs — explorer links,
+     * wallet install pages and the footer link open in a themed Chrome
+     * Custom Tab / SFSafariViewController (modal pageSheet on iOS) instead
+     * of bouncing the user out to the external browser. Wallet deep links
+     * (custom schemes) always go through `Linking` — Custom Tabs only
+     * handle web URLs. Optional: without it every URL opens via `Linking`
+     * exactly as before.
+     *
+     * Build one with `createThemedBrowserSession({ reborn, expo }, { theme })`
+     * — see browser/inapp-browser.ts for the preference chain and why
+     * passkey-needing web wallets must use this surface instead of a WebView.
+     */
+    browser?: ThemedBrowserSession;
 }
-export declare function AppKitModal({ client, open, onClose, theme, mode, title, logo, }: AppKitModalProps): React.JSX.Element | null;
+export declare function AppKitModal({ client, open, onClose, theme, mode, title, logo, browser, }: AppKitModalProps): React.JSX.Element | null;
 //# sourceMappingURL=AppKitModal.d.ts.map

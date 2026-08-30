@@ -20,4 +20,5 @@ export { createAsyncStorage, createMemoryStorage, type KeyValueLikeStorage, } fr
 export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, type MobileWalletDeepLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';
 export { detectDeviceLocale, applyDeviceLocale, normalizeToDeviceLocale, } from './locale.js';
+export { createThemedBrowserSession, buildRebornOptions, buildExpoOptions, type BrowserThemeTokens, type BrowserSurface, type BrowserOpenResult, type BrowserAuthResult, type ThemedBrowserOptions, type ThemedBrowserSession, type RebornBrowserLike, type ExpoWebBrowserLike, type AuthSessionShape, } from './browser/inapp-browser.js';
 //# sourceMappingURL=index.d.ts.map

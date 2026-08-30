@@ -20,4 +20,5 @@ export { createAsyncStorage, createMemoryStorage, } from './storage.js';
 export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';
 export { detectDeviceLocale, applyDeviceLocale, normalizeToDeviceLocale, } from './locale.js';
+export { createThemedBrowserSession, buildRebornOptions, buildExpoOptions, } from './browser/inapp-browser.js';
 //# sourceMappingURL=index.js.map

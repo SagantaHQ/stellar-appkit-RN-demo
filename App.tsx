@@ -39,7 +39,7 @@ function isDarkColor(hex: string): boolean {
 }
 
 function Root() {
-  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation } = useAppKitDemo();
+  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation, browser } = useAppKitDemo();
   return (
     <View style={[styles.root, { backgroundColor: theme.colorBg }]}>
       <StatusBar style={isDarkColor(theme.colorBg) ? 'light' : 'dark'} />
@@ -48,9 +48,12 @@ function Root() {
       </SafeAreaView>
 
       {/* Bottom-sheet presentation — always mounted, see the comment atop
-          this file. The inline presentation renders inside HomeScreen. */}
+          this file. The inline presentation renders inside HomeScreen. The
+          themed browser prop makes explorer/install/footer links open in a
+          themed Chrome Custom Tab / SFSafariViewController instead of
+          leaving the app. */}
       {presentation === 'bottomsheet' && (
-        <AppKitModal client={client} open={modalOpen} onClose={closeModal} theme={theme} />
+        <AppKitModal client={client} open={modalOpen} onClose={closeModal} theme={theme} browser={browser} />
       )}
 
       {/* Albedo + xBull WebView screens (rendered on demand by the bridges). */}
