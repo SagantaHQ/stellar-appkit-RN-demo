@@ -39,7 +39,7 @@ function isDarkColor(hex: string): boolean {
 }
 
 function Root() {
-  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation, browser, autoCloseOnComplete } = useAppKitDemo();
+  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation, browser } = useAppKitDemo();
   return (
     <View style={[styles.root, { backgroundColor: theme.colorBg }]}>
       <StatusBar style={isDarkColor(theme.colorBg) ? 'light' : 'dark'} />
@@ -59,7 +59,6 @@ function Root() {
           onClose={closeModal}
           theme={theme}
           browser={browser}
-          autoCloseOnComplete={autoCloseOnComplete}
         />
       )}
 

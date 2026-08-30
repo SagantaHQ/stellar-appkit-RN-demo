@@ -12,6 +12,10 @@
  *   restarts the WC relay on every AppState 'active' so pairing/sign
  *   approvals that settled while the app was backgrounded (behind the
  *   wallet app) actually get delivered
+ * - `attachAppFocusReturn()` — headless focus return: re-opens the app's
+ *   own deep link (`appMetadata.redirect`) when the wallet operation
+ *   settles while the app is backgrounded, so the user lands back in the
+ *   app instead of staring at the wallet. The modal installs this itself
  *
  * UI (modal) lives in `@saganta/stellar-appkit-react-native/ui`, polyfills in
  * `@saganta/stellar-appkit-react-native/polyfills`, the Albedo WebView screen
@@ -24,6 +28,7 @@ export { createAsyncStorage, createMemoryStorage, } from './storage.js';
 export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';
 export { attachWalletConnectForegroundRefresh, } from './wc-foreground.js';
+export { attachAppFocusReturn, resolveAppFocusTarget, shouldAttemptAppFocus, FOCUS_ATTEMPT_COOLDOWN_MS, } from './focus-return.js';
 export { detectDeviceLocale, applyDeviceLocale, normalizeToDeviceLocale, } from './locale.js';
 export { createThemedBrowserSession, buildRebornOptions, buildExpoOptions, } from './browser/inapp-browser.js';
 //# sourceMappingURL=index.js.map

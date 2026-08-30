@@ -41,12 +41,33 @@ export interface StellarAppKitConfig {
      * `window.location.origin` (browser). `domain` for SIWS is derived
      * from `url` by stripping the protocol and path. `description` and
      * `icons` are optional but recommended for WalletConnect.
+     *
+     * `redirect` (optional, mobile focus-return): your app's own deep-link
+     * target, following the WalletConnect/Reown metadata standard. It is
+     * included verbatim in every WalletConnect session proposal, where a
+     * cooperating mobile wallet reads it after the user approves or rejects
+     * and opens it — which backgrounds the wallet and re-focuses your app
+     * automatically (the standard mobile round trip). On React Native, the
+     * `@saganta/stellar-appkit-react-native` modal also uses it as the
+     * best-effort self-open target when an operation settles while your app
+     * is backgrounded. Ignored on web. Example:
+     * ```ts
+     * appMetadata: {
+     *   name: 'My App',
+     *   url: 'https://myapp.com',
+     *   redirect: { native: 'myapp://', universal: 'https://myapp.com' },
+     * }
+     * ```
      */
     appMetadata?: {
         name: string;
         description?: string;
         url?: string;
         icons?: string[];
+        redirect?: {
+            native?: string;
+            universal?: string;
+        };
     };
     /** Set false to disable cross-tab session sync (on by default, no-ops where BroadcastChannel isn't available anyway). */
     syncAcrossTabs?: boolean;
@@ -129,17 +150,31 @@ export interface StellarAppKitModalConfig {
  * for apps that don't use the default set.
  */
 export declare function defaultConnectors(): WalletConnector[];
+/** The mobile focus-return piece of `appMetadata` — WC/Reown metadata standard. */
+export type AppMetadataRedirect = {
+    native?: string;
+    universal?: string;
+};
+/** The full resolved `appMetadata` shape used internally (WC metadata standard). */
+export type AppKitAppMetadata = {
+    name: string;
+    description?: string;
+    url?: string;
+    icons?: string[];
+    redirect?: AppMetadataRedirect;
+};
 /**
  * Normalizes the user-provided `appMetadata` (WC metadata shape) into the
  * fully-resolved shape the SDK uses internally.
  *
  * Input shape (WalletConnect/Reown metadata standard):
- *   { name, description?, url?, icons? }
+ *   { name, description?, url?, icons?, redirect? }
  *
  * - `url` is auto-derived from `window.location.origin` when omitted (browser)
  * - `url` is auto-formatted: prefixed with `https://` if no protocol
  * - `domain` (for SIWS) is derived from `url` by stripping protocol + path
  * - `uri` (for SIWS) = `url`
+ * - `redirect` values are trimmed and empty strings dropped
  *
  * The same object is passed directly to WalletConnect as its `metadata`.
  */
@@ -148,12 +183,8 @@ export declare function normalizeAppMetadata(meta: {
     description?: string;
     url?: string;
     icons?: string[];
-}): {
-    name: string;
-    description?: string;
-    url?: string;
-    icons?: string[];
-};
+    redirect?: AppMetadataRedirect;
+}): AppKitAppMetadata;
 /**
  * Derives the SIWS `domain` from the appMetadata `url` by stripping the
  * protocol and path. E.g. `"https://app.example.com/path"` → `"app.example.com"`.

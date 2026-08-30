@@ -66,7 +66,7 @@ import {
   sunsetLight,
   type ConnectThemeRN,
 } from '@saganta/stellar-appkit-react-native/ui';
-import { APP_DESCRIPTION, APP_ICON_URL, APP_NAME, APP_URL, WC_PROJECT_ID } from './constants';
+import { APP_DESCRIPTION, APP_ICON_URL, APP_NAME, APP_REDIRECT, APP_URL, WC_PROJECT_ID } from './constants';
 import { randomNonce } from './stellar';
 
 export interface ThemeOption {
@@ -147,15 +147,6 @@ interface AppKitDemoContextValue {
   siwsEnabled: boolean;
   setSiwsEnabled: (on: boolean) => void;
   /**
-   * Auto-minimize toggle — the modal's `autoCloseOnComplete` prop: when the
-   * operation the app requested completes (connect settles after the
-   * deep-link return, or the sign queue drains cleanly), the sheet
-   * dismisses itself after a short confirmation flash and focus returns
-   * to this screen. Off = the web modal's stay-open account view.
-   */
-  autoCloseOnComplete: boolean;
-  setAutoCloseOnComplete: (on: boolean) => void;
-  /**
    * The themed in-app browser (Chrome Custom Tabs / SFSafariViewController,
    * styled like a modal from the active theme). Passed to the modal so
    * explorer/install/footer links open in-app, and usable directly.
@@ -173,7 +164,6 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
   const [presentation, setPresentation] = useState<'bottomsheet' | 'inline'>('bottomsheet');
   const [locale, setLocaleState] = useState<LocaleCode>(getLocale());
   const [siwsEnabled, setSiwsEnabled] = useState(false);
-  const [autoCloseOnComplete, setAutoCloseOnComplete] = useState(true);
 
   // Follow the device language at startup — unsupported languages keep
   // English. The switcher below can then override at any time.
@@ -270,6 +260,14 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
         description: APP_DESCRIPTION,
         url: APP_URL,
         icons: [APP_ICON_URL],
+        // The demo's own deep link (app.json `scheme`) — mobile focus return.
+        // It rides every WalletConnect session proposal, so a cooperating
+        // wallet re-opens the demo right after approve/reject (backgrounding
+        // itself), and the modal re-opens it as a best-effort fallback when a
+        // result lands while the demo is backgrounded. In Expo Go the custom
+        // scheme isn't OS-registered — both paths then no-op and swiping back
+        // still settles instantly; in a dev-client / EAS build it's live.
+        ...(APP_REDIRECT ? { redirect: { native: APP_REDIRECT } } : {}),
       },
       storage: createAsyncStorage(AsyncStorage),
       connectors,
@@ -354,11 +352,9 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       setAppLocale,
       siwsEnabled,
       setSiwsEnabled,
-      autoCloseOnComplete,
-      setAutoCloseOnComplete,
       browser,
     }),
-    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, autoCloseOnComplete, browser]
+    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, browser]
   );
 
   return <AppKitDemoContext.Provider value={value}>{children}</AppKitDemoContext.Provider>;

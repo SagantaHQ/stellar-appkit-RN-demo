@@ -1,5 +1,7 @@
 /** Shared constants for the demo app. */
 
+import Constants from 'expo-constants';
+
 export const APP_NAME = 'Stellar AppKit RN Demo';
 
 export const APP_DESCRIPTION =
@@ -12,6 +14,17 @@ export const APP_ICON_URL =
   'https://raw.githubusercontent.com/SagantaHQ/stellar-appkit-RN-demo/main/assets/icon.png';
 
 export const LIBRARY_URL = 'https://github.com/SagantaHQ/stellar-appkit';
+
+/**
+ * The demo's own deep link — app.json's `scheme`, formatted as a URL.
+ * Fed to `appMetadata.redirect` for mobile focus return: it rides every
+ * WalletConnect session proposal (cooperating wallets re-open the demo
+ * after approve/reject), and the modal re-opens it as a best-effort
+ * fallback when a result lands while the demo is backgrounded. In Expo Go
+ * the custom scheme isn't OS-registered — both paths no-op there (swiping
+ * back still settles instantly); in a dev-client / EAS build it's live.
+ */
+export const APP_REDIRECT = Constants.expoConfig?.scheme ? `${Constants.expoConfig.scheme}://` : undefined;
 
 export const DOCS_URL = 'https://stellarappkit.saganta.com';
 

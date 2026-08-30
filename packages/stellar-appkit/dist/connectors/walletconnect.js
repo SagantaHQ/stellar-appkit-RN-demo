@@ -71,6 +71,7 @@ export function createWalletConnectConnector(opts) {
                 description: appkitAppMetadata.description || `${appkitAppMetadata.name} — Stellar dApp`,
                 url: appkitAppMetadata.url || 'https://example.com',
                 icons: appkitAppMetadata.icons || [],
+                ...(appkitAppMetadata.redirect ? { redirect: appkitAppMetadata.redirect } : {}),
             };
         }
         // Derive from window.location

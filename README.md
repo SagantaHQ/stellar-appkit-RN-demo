@@ -112,13 +112,16 @@ which requires a project id:
   (Node's `crypto` is provided by `src/node-crypto-shim.js`, a `@noble/hashes`-backed
   createHash routed in `metro.config.js`). The session persists in `AsyncStorage` and
   the card shows the signed-in address + expiry with a Sign-out button.
-- **Auto-minimize on completion** — when the operation this app requested completes (approve the
-  connect in the wallet app and return, or let the wallet answer a sign request), the sheet
-  dismisses itself after a short “connected” flash and focus lands back on the demo screen — the
-  mobile deep-link pattern, no extra dismissal tap. Rejections/errors never auto-close (the retry
-  pill stays), every user navigation disarms it, and a reopened modal never self-closes. An
-  “Auto-minimize on completion” card toggles the modal's `autoCloseOnComplete` prop — off gives
-  the web modal's stay-open account view.
+- **Return focus after the wallet answers** — the deep-link handoff puts the user inside the wallet
+  app to approve or reject; the moment they answer, the demo re-gains focus instead of leaving them
+  staring at the wallet. `appMetadata.redirect` (the app.json `scheme`) rides every WalletConnect
+  session proposal — cooperating wallets open it right after approve/reject, backgrounding
+  themselves — and when a result lands while the demo is backgrounded, the modal re-opens the link
+  itself (best effort; the OS decides — neither platform lets a backgrounded app force itself to
+  the foreground). Success AND failure both count as settled; in-app outcomes never steal focus;
+  with no redirect configured nothing self-opens. In Expo Go the custom scheme isn't OS-registered
+  (both paths no-op, swiping back still settles instantly via the zombie-socket fix) — the
+  bounce-back is live in a dev-client / EAS build.
 - **Themed in-app browser** — a new "In-app browser" card + every web link in the
   modal (explorer, wallet install pages, the footer) opens in a themed Chrome Custom
   Tab / SFSafariViewController — modal `pageSheet` on iOS, themed toolbars on Android —
@@ -150,7 +153,7 @@ The interesting files, in the order the app loads them:
 | `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` at the root. |
 | `src/stellar.ts` | Demo Stellar helpers — plain Horizon `fetch` for account/balance, stellar-sdk XDR builders, `submitSignedTx()` (REST submit), friendbot faucet, SIWS nonce (AppKit signs; building/submitting XDR is your app's job). |
 | `src/node-crypto-shim.js` | `createHash('sha256'/'sha512')` via `@noble/hashes` — stands in for Node's `crypto` so `siws-verify` runs on-device (routed in metro.config.js). |
-| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, auto-minimize toggle, sign (message + self-payment), send XLM (sign + submit), SIWS, in-app browser, friendbot, theme. |
+| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, focus-return card, sign (message + self-payment), send XLM (sign + submit), SIWS, in-app browser, friendbot, theme. |
 | `scripts/test-siws-e2e.mjs` | Node-run e2e proof of the SIWS verification path (valid sign-in, wrong nonce/domain, foreign signature, SEP-0053 hashed signing). |
 | `metro.config.js` | Five Expo Go-specific resolver tweaks (see below). |
 

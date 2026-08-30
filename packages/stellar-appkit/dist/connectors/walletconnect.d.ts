@@ -29,17 +29,27 @@ export interface WalletConnectConnectorOptions {
      *   description: 'A Stellar dApp',
      *   url: 'https://saganta.com',
      *   icons: ['https://saganta.com/icon.png'],
+     *   redirect: { native: 'myapp://', universal: 'https://myapp.com' },
      * }
      * ```
      * The `url` field is also used as the `uri` in SIWS messages.
      * The `icons[0]` field is used as the signing/preview app icon.
      * The `name` field is used as the app name in the connecting view.
+     *
+     * The `redirect` field (WalletConnect metadata standard) tells cooperating
+     * mobile wallets which deep link re-opens THIS app — the wallet opens it
+     * after the user approves/rejects, backgrounding itself and returning
+     * focus to the dapp. Ignored by wallets that don't support it.
      */
     metadata?: {
         name: string;
         description: string;
         url: string;
         icons: string[];
+        redirect?: {
+            native?: string;
+            universal?: string;
+        };
     };
     /**
      * Called with the WC pairing URI when a new connection is initiated.
