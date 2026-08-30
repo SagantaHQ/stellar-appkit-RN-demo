@@ -88,6 +88,12 @@ export declare const en: {
         readonly disconnect: 'Disconnect';
         readonly connect_wallet: 'Connect wallet';
     };
+    /** In-app WebView toolbar (RN — Albedo/xBull screens) */
+    readonly browser: {
+        readonly reload: 'Reload';
+        readonly open_in_browser: 'Open in browser';
+        readonly copy_link: 'Copy link';
+    };
     /** Wallet name fallbacks */
     readonly wallet: {
         readonly fallback_name: 'Wallet';

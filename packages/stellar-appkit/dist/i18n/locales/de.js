@@ -72,6 +72,11 @@ const de = {
         "disconnect": "Trennen",
         "connect_wallet": "Wallet verbinden"
     },
+    "browser": {
+        "reload": "Neu laden",
+        "open_in_browser": "Im Browser öffnen",
+        "copy_link": "Link kopieren"
+    },
     "wallet": {
         "fallback_name": "Wallet",
         "fallback_your_wallet": "deiner Wallet"

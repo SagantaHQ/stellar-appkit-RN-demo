@@ -14,6 +14,11 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  *     `window.open(...).postMessage(params, '*')` would have delivered.
  *  3. The user confirms in Albedo's own UI; the result arrives at our shim.
  *
+ * The screen carries a browser toolbar (WebViewToolbar): the current URL
+ * chip with tap-to-copy, Reload, and Open-in-browser — the browser
+ * affordances a bare WebView lacks. Reload restarts the handshake: the
+ * fresh page re-signals readiness and the intent params are re-delivered.
+ *
  * Security notes:
  * - The WebView is locked to `https://albedo.link/` (navigation guard).
  * - `origin` is sent with the intent so Albedo can display the requesting
@@ -21,8 +26,9 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * - The bridge resolves a single intent per open — no ambient session.
  */
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { WebViewToolbar } from '../browser/WebViewToolbar.js';
 /**
  * Creates the bridge object to pass to `createAlbedoWebViewConnector()` /
  * `defaultReactNativeConnectors({ albedoBridge })`. One active intent at a
@@ -51,6 +57,7 @@ export function createAlbedoWebViewBridge(render) {
 }
 export function AlbedoWebViewScreen({ url, params, onResult, onFail, dark = true }) {
     const [ready, setReady] = useState(false);
+    const [currentUrl, setCurrentUrl] = useState(url);
     const sentRef = useRef(false);
     const webviewRef = useRef(null);
     const bg = dark ? '#09090B' : '#FFFFFF';
@@ -100,11 +107,20 @@ export function AlbedoWebViewScreen({ url, params, onResult, onFail, dark = true
         // Lock the WebView to Albedo's origin.
         return nav.url.startsWith('https://albedo.link/');
     }, []);
-    return (_jsx(Modal, { visible: true, animationType: "slide", onRequestClose: () => onFail(new Error('Albedo confirmation was closed before completing.')), children: _jsxs(View, { style: [styles.container, { backgroundColor: bg }], children: [_jsx(View, { style: styles.header, children: _jsx(Pressable, { onPress: () => onFail(new Error('Albedo confirmation was cancelled.')), hitSlop: 12, children: _jsx(Text, { style: { color: fg, fontSize: 15, fontWeight: '600' }, children: "Cancel" }) }) }), _jsx(WebView, { ref: webviewRef, source: { uri: url }, injectedJavaScriptBeforeContentLoaded: openerShim, onMessage: handleMessage, onShouldStartLoadWithRequest: guardNavigation, javaScriptEnabled: true, domStorageEnabled: true, setSupportMultipleWindows: false, allowsBackForwardNavigationGestures: false, renderLoading: () => (_jsx(View, { style: [styles.loader, { backgroundColor: bg }], children: _jsx(ActivityIndicator, {}) })) }), !ready && (_jsxs(View, { style: [styles.loader, { backgroundColor: bg }], pointerEvents: "none", children: [_jsx(ActivityIndicator, {}), _jsx(Text, { style: { color: fg, marginTop: 8 }, children: "Opening Albedo\u2026" })] }))] }) }));
+    // Navigation tracking feeds the toolbar's URL chip, and a fresh page load
+    // (reload button, internal redirect) restarts the handshake: readiness
+    // resets and the intent params are re-delivered when Albedo re-pings.
+    const handleNavigationState = useCallback((nav) => {
+        setCurrentUrl(nav.url);
+        if (nav.loading) {
+            sentRef.current = false;
+            setReady(false);
+        }
+    }, []);
+    return (_jsx(Modal, { visible: true, animationType: "slide", onRequestClose: () => onFail(new Error('Albedo confirmation was closed before completing.')), children: _jsxs(View, { style: [styles.container, { backgroundColor: bg }], children: [_jsx(WebViewToolbar, { url: currentUrl, dark: dark, onCancel: () => onFail(new Error('Albedo confirmation was cancelled.')), onReload: () => webviewRef.current?.reload() }), _jsx(WebView, { ref: webviewRef, source: { uri: url }, injectedJavaScriptBeforeContentLoaded: openerShim, onMessage: handleMessage, onShouldStartLoadWithRequest: guardNavigation, onNavigationStateChange: handleNavigationState, javaScriptEnabled: true, domStorageEnabled: true, setSupportMultipleWindows: false, allowsBackForwardNavigationGestures: false, textInteractionEnabled: true, renderLoading: () => (_jsx(View, { style: [styles.loader, { backgroundColor: bg }], children: _jsx(ActivityIndicator, {}) })) }), !ready && (_jsxs(View, { style: [styles.loader, { backgroundColor: bg }], pointerEvents: "none", children: [_jsx(ActivityIndicator, {}), _jsx(Text, { style: { color: fg, marginTop: 8 }, children: "Opening Albedo\u2026" })] }))] }) }));
 }
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { paddingHorizontal: 16, paddingVertical: 12 },
     loader: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
 });
 //# sourceMappingURL=AlbedoWebViewScreen.js.map

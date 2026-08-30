@@ -26,6 +26,10 @@
  *  see the connector); the WebView never sees plaintext requests.
  * - One operation per screen instance — the connector closes the WebView
  *  after each request cycle, mirroring the web SDK's popup lifecycle.
+ *
+ * The screen carries a browser toolbar (WebViewToolbar): the current URL
+ * chip with tap-to-copy, Reload, and Open-in-browser — the browser
+ * affordances a bare WebView lacks.
  */
 import React from 'react';
 import type { XBullWebViewBridge, XBullWalletHandle, XBullWalletMessage } from '../connectors/xbull-webview.js';

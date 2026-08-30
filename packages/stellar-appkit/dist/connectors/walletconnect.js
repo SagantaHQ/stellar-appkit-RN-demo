@@ -201,6 +201,14 @@ export function createWalletConnectConnector(opts) {
     /** When a fatal relay error fires, we store the message here so connect()
      *  can include it in the thrown ConnectError. */
     let fatalErrorMessage = null;
+    /**
+     * True while a connect()'s pairing is waiting for the wallet to approve.
+     * refreshTransport() checks this: a foregrounding app must restart the
+     * relay while the approval wait is live (the wallet may have settled the
+     * session while we were suspended), not just when a session already
+     * exists.
+     */
+    let connectInFlight = false;
     /** Timeout for waiting for the wallet to approve the pairing — 60s. */
     /**
      * Tears down the WC client's WebSocket relay and clears the singleton.
@@ -258,6 +266,113 @@ export function createWalletConnectConnector(opts) {
             });
         }
         return clientInitPromise;
+    }
+    /**
+     * In-flight (or settled) cold-start rehydration — memoized so concurrent
+     * getAddress()/getNetwork() calls (StellarAppKit.restore() can fire both)
+     * share ONE rehydration instead of racing each other. Nulled when it
+     * settles so a failed attempt can retry later.
+     */
+    let rehydratePromise = null;
+    /**
+     * Rehydrates a persisted WC session on a cold connector — the read half
+     * of the `WC_STORAGE_KEY` persistence connect() writes.
+     *
+     * WHY THIS IS LAZY (and not a restore() method): StellarAppKit.restore()
+     * validates every persisted session through `connector.getAddress()` —
+     * there is no connector-level restore hook. So getAddress()/getNetwork()
+     * call this when their cached state is empty, BEFORE deciding they're not
+     * connected. On success the connector is fully usable again (sign
+     * requests, peer metadata, approved methods); StellarAppKit.restore()
+     * then keeps the session it already has on file.
+     *
+     * What makes it SAFE:
+     * - Storage first, SDK second: without a persisted topic this returns
+     *   without ever paying the SignClient init (the multi-second RN
+     * cold-start stays a warmUp()/connect()-only cost).
+     * - The SDK's own session store decides liveness: `session.get(topic)`
+     *   returns the session only if it still exists (the WC SDK persists its
+     *   store — localStorage on web, AsyncStorage via
+     *   @walletconnect/react-native-compat on RN — and expires sessions
+     *   server-side after ~7 days). A missing session clears our persisted
+     *   key and returns: the caller throws its normal "not connected".
+     * - Best-effort by design — any error just leaves the connector cold.
+     */
+    async function restoreFromStorage() {
+        if (cachedAddress)
+            return; // already live (or rehydrated)
+        if (!opts.storage)
+            return; // never persisted — nothing to restore
+        if (!rehydratePromise) {
+            rehydratePromise = (async () => {
+                let raw;
+                try {
+                    raw = await opts.storage.getItem(WC_STORAGE_KEY);
+                }
+                catch {
+                    return; // storage unavailable — stay cold
+                }
+                if (!raw)
+                    return;
+                let saved;
+                try {
+                    saved = JSON.parse(raw);
+                }
+                catch {
+                    try {
+                        await opts.storage.removeItem(WC_STORAGE_KEY);
+                    }
+                    catch { /* best-effort */ }
+                    return; // corrupt record — drop it
+                }
+                if (!saved.topic || !saved.address)
+                    return;
+                try {
+                    // The SDK init is the expensive part — only paid when a persisted
+                    // session actually exists (see doc). Shares the memoized
+                    // clientInitPromise with warmUp()/connect().
+                    const wc = await ensureClient();
+                    const session = wc.session.get(saved.topic);
+                    if (!session || session.topic !== saved.topic) {
+                        // Wallet deleted the session / it expired — drop our record so
+                        // the next restore doesn't repeat this lookup.
+                        try {
+                            await opts.storage.removeItem(WC_STORAGE_KEY);
+                        }
+                        catch { /* best-effort */ }
+                        return;
+                    }
+                    sessionTopic = saved.topic;
+                    cachedAddress = saved.address;
+                    // Peer metadata: prefer our stored copy, fall back to the SDK's.
+                    if (saved.peerMetadata?.name) {
+                        peerMetadata = saved.peerMetadata;
+                    }
+                    else {
+                        const peer = session.peer?.metadata;
+                        peerMetadata = peer?.name
+                            ? { name: peer.name, url: peer.url || null, icon: peer.icons?.[0] || null }
+                            : null;
+                    }
+                    grantedMethods = new Set(session.namespaces?.stellar?.methods ?? []);
+                    // Network: the wallet reported it at settle time, but that answer
+                    // wasn't persisted — adopt the app's configured network, exactly
+                    // like connect() does when the wallet didn't approve
+                    // stellar_getNetwork.
+                    cachedNetwork = {
+                        network: appkitNetwork ?? 'TESTNET',
+                        networkPassphrase: resolveNetworkPassphrase(),
+                    };
+                }
+                catch {
+                    // Init failed (offline, bad projectId, …) — leave the record in
+                    // place; a later call retries the rehydration.
+                }
+            })().finally(() => {
+                rehydratePromise = null;
+            });
+        }
+        await rehydratePromise;
     }
     /** The one-shot init: dynamic import + SignClient.init + event wiring. */
     async function initClient() {
@@ -413,227 +528,326 @@ export function createWalletConnectConnector(opts) {
                 // Silent by design — see doc comment above.
             }
         },
+        /**
+         * Forces a relay transport restart: disconnect the socket, reconnect,
+         * resubscribe every stored topic. The relay (IRN) keeps messages queued
+         * for subscribed topics (~24h TTL), so a restart re-delivers anything
+         * published while the connection was dead.
+         *
+         * WHY THIS EXISTS — the React Native zombie socket. The moment a wallet
+         * deep link fires (connect pairing or a sign request handoff), the OS
+         * backgrounds this app and kills or zombifies the relay WebSocket. The
+         * WC SDK's own recovery paths never fire on RN:
+         *
+         *   - its ping watchdog only starts under Node
+         *     (`typeof process.versions.node === 'string'` — false on Hermes),
+         *   - its online/offline listener depends on `navigator.onLine` /
+         *     `global.NetInfo`, neither of which exists on a bare RN runtime,
+         *   - and RN's WebSocket doesn't always surface the OS-level socket
+         *     death, so the JS object can keep reporting readyState OPEN while
+         *     the TCP connection is long gone.
+         *
+         * The wallet then approves in its own app, the relay queues
+         * `session_settle` (or the sign response) for the pairing topic, and
+         * nothing delivers it: `approval()` hangs forever and the modal stays on
+         * "Continue in {wallet}" with a spinner — even though the wallet side
+         * shows a successful connection.
+         *
+         * The fix is driven from the outside: the RN modal (or a headless app
+         * via `attachWalletConnectForegroundRefresh()`) calls this on every
+         * AppState 'active'. `restartTransport()` is the SDK's own
+         * disconnect→reconnect→resubscribe path; on reconnect the subscriber
+         * batch-subscribes all stored topics and the relay re-delivers the
+         * queued message, which resolves the in-flight approval()/request().
+         *
+         * Fire-and-forget by design: never throws, never initializes a cold
+         * client (a warm-up is a separate concern), and no-ops when nothing
+         * relay-related is live — an idle connector has nothing to resubscribe
+         * (transportOpen is even a no-op without topics).
+         */
+        refreshTransport() {
+            // No client yet (or torn down) — nothing to refresh. Deliberately do
+            // NOT ensureClient() here: a cold connector has no subscriptions, so
+            // a restart would be a pure cost.
+            if (!client)
+                return;
+            // Nothing WalletConnect-related in flight: no pairing approval wait,
+            // no live session (and therefore no sign requests either). Skip —
+            // restarting here would only churn a healthy socket for nothing.
+            if (!connectInFlight && !sessionTopic)
+                return;
+            const relayer = client.core?.relayer;
+            if (!relayer)
+                return;
+            try {
+                if (typeof relayer.restartTransport === 'function') {
+                    // The SDK's own restart path — confirmOnlineStateOrThrow (a no-op
+                    // on RN without global.NetInfo) → resetTransport → transportOpen →
+                    // subscriber.start() resubscribes everything. Its rejections are
+                    // expected under transient offline foregrounds — swallow them; the
+                    // SDK's internal reconnect machinery keeps retrying either way.
+                    void relayer.restartTransport().catch(() => undefined);
+                    return;
+                }
+                // Older SDK without restartTransport: manual equivalent. The two
+                // hops are sequenced (not parallel) on purpose — transportOpen()
+                // connects AND resubscribes; firing it before the old socket is
+                // closed would race two providers on one subscriber set.
+                void (async () => {
+                    try {
+                        await relayer.transportDisconnect?.();
+                        await relayer.transportOpen?.();
+                    }
+                    catch {
+                        // Best-effort — the SDK retries on its own schedules.
+                    }
+                })();
+            }
+            catch {
+                // Never let a liveness nudge become a user-visible error.
+            }
+        },
         async connect(_connectOpts) {
-            return withNormalizedError(meta.id, async () => {
-                // Reset abort flag at the start of each connect attempt
-                connectAborted = false;
-                fatalErrorMessage = null;
-                const wc = await ensureClient();
-                if (connectAborted) {
-                    throw ConnectError.invalidRequest(fatalErrorMessage
+            // connectInFlight gates refreshTransport(): while a pairing approval
+            // wait is live, a foregrounding app must restart the relay even though
+            // no session exists yet (see refreshTransport).
+            connectInFlight = true;
+            // Retires the abort-poll loop below when this attempt settles — the
+            // inner callback closes over this flag.
+            let stopAbortPoll = false;
+            try {
+                return await withNormalizedError(meta.id, async () => {
+                    // Reset abort flag at the start of each connect attempt
+                    connectAborted = false;
+                    fatalErrorMessage = null;
+                    const wc = await ensureClient();
+                    if (connectAborted) {
+                        throw ConnectError.invalidRequest(fatalErrorMessage
+                            ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
+                            : 'WalletConnect connection aborted — relay error (check your projectId).', undefined, meta.id);
+                    }
+                    // Create the abort promise EARLY — before wc.connect() — because
+                    // wc.connect() can hang if the relay is unreachable (e.g. invalid
+                    // projectId). The fatal error fires asynchronously during wc.connect(),
+                    // and without racing against the abort promise, we'd hang forever.
+                    //
+                    // The poll stops via stopAbortPoll (connect()-scoped) once the
+                    // attempt settles either way — without it the loop reschedules
+                    // itself forever, leaking one immortal timer per connect() (on RN
+                    // that's a 200ms wakeup for the rest of the app's life, per attempt).
+                    const abortPromise = new Promise((_, reject) => {
+                        const checkAbort = () => {
+                            if (connectAborted) {
+                                reject(new Error('__WC_ABORTED__'));
+                                return;
+                            }
+                            if (stopAbortPoll)
+                                return;
+                            setTimeout(checkAbort, 200);
+                        };
+                        checkAbort();
+                    });
+                    // Helper: creates a ConnectError from the current fatalErrorMessage
+                    const makeAbortError = () => ConnectError.invalidRequest(fatalErrorMessage
                         ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
                         : 'WalletConnect connection aborted — relay error (check your projectId).', undefined, meta.id);
-                }
-                // Create the abort promise EARLY — before wc.connect() — because
-                // wc.connect() can hang if the relay is unreachable (e.g. invalid
-                // projectId). The fatal error fires asynchronously during wc.connect(),
-                // and without racing against the abort promise, we'd hang forever.
-                const abortPromise = new Promise((_, reject) => {
-                    const checkAbort = () => {
-                        if (connectAborted) {
-                            reject(new Error('__WC_ABORTED__'));
-                            return;
-                        }
-                        setTimeout(checkAbort, 200);
-                    };
-                    checkAbort();
-                });
-                // Helper: creates a ConnectError from the current fatalErrorMessage
-                const makeAbortError = () => ConnectError.invalidRequest(fatalErrorMessage
-                    ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
-                    : 'WalletConnect connection aborted — relay error (check your projectId).', undefined, meta.id);
-                // Propose a session with the Stellar namespace.
-                // Race against abortPromise — if the relay fires a fatal error
-                // during wc.connect() (e.g. "Project not found"), the abort promise
-                // rejects first and we surface the error instead of hanging forever.
-                let uri;
-                let approval;
-                try {
-                    const result = await Promise.race([
-                        wc.connect({
-                            // NOTE: `requiredNamespaces` is deprecated in
-                            // @walletconnect/sign-client >= 2.17 — it prints
-                            // "requiredNamespaces are deprecated and are automatically
-                            // assigned to optionalNamespaces" and merges the two (union)
-                            // before proposing anyway, so we propose everything as optional
-                            // namespaces directly. On the wire this is identical to the
-                            // old required + optional split.
-                            //
-                            // The method list is the documented Stellar WalletConnect set
-                            // (Freighter Mobile, LOBSTR, Hana, HOT Wallet — see
-                            // docs.freighter.app/mobile-walletconnect):
-                            //   stellar_signXDR / stellar_signAndSubmitXDR /
-                            //   stellar_signMessage / stellar_signAuthEntry
-                            // plus stellar_getNetwork, which only some wallets implement.
-                            // Wallets approve the subset they support; we verify what made
-                            // it through after the session settles (below).
-                            optionalNamespaces: {
-                                stellar: {
-                                    chains: [resolveWcChainId()],
-                                    methods: [
-                                        'stellar_signXDR',
-                                        'stellar_signAndSubmitXDR',
-                                        'stellar_signMessage',
-                                        'stellar_signAuthEntry',
-                                        'stellar_getNetwork',
-                                    ],
-                                    events: ['accountsChanged'],
+                    // Propose a session with the Stellar namespace.
+                    // Race against abortPromise — if the relay fires a fatal error
+                    // during wc.connect() (e.g. "Project not found"), the abort promise
+                    // rejects first and we surface the error instead of hanging forever.
+                    let uri;
+                    let approval;
+                    try {
+                        const result = await Promise.race([
+                            wc.connect({
+                                // NOTE: `requiredNamespaces` is deprecated in
+                                // @walletconnect/sign-client >= 2.17 — it prints
+                                // "requiredNamespaces are deprecated and are automatically
+                                // assigned to optionalNamespaces" and merges the two (union)
+                                // before proposing anyway, so we propose everything as optional
+                                // namespaces directly. On the wire this is identical to the
+                                // old required + optional split.
+                                //
+                                // The method list is the documented Stellar WalletConnect set
+                                // (Freighter Mobile, LOBSTR, Hana, HOT Wallet — see
+                                // docs.freighter.app/mobile-walletconnect):
+                                //   stellar_signXDR / stellar_signAndSubmitXDR /
+                                //   stellar_signMessage / stellar_signAuthEntry
+                                // plus stellar_getNetwork, which only some wallets implement.
+                                // Wallets approve the subset they support; we verify what made
+                                // it through after the session settles (below).
+                                optionalNamespaces: {
+                                    stellar: {
+                                        chains: [resolveWcChainId()],
+                                        methods: [
+                                            'stellar_signXDR',
+                                            'stellar_signAndSubmitXDR',
+                                            'stellar_signMessage',
+                                            'stellar_signAuthEntry',
+                                            'stellar_getNetwork',
+                                        ],
+                                        events: ['accountsChanged'],
+                                    },
                                 },
-                            },
-                        }),
+                            }),
+                            abortPromise,
+                        ]).catch((err) => {
+                            if (err instanceof Error && err.message === '__WC_ABORTED__') {
+                                throw makeAbortError();
+                            }
+                            throw err;
+                        });
+                        uri = result.uri;
+                        approval = result.approval;
+                    }
+                    catch (err) {
+                        // The connect() call itself can fail with a fatal relay error
+                        // (e.g. "Project not found") — detect and surface it.
+                        if (isFatalRelayError(err)) {
+                            teardownClient();
+                            throw ConnectError.invalidRequest(`WalletConnect relay error: ${err instanceof Error ? err.message : String(err)}. ` +
+                                'Check your projectId at cloud.walletconnect.com.', undefined, meta.id);
+                        }
+                        if (err instanceof ConnectError)
+                            throw err;
+                        throw err;
+                    }
+                    if (connectAborted) {
+                        throw makeAbortError();
+                    }
+                    // Surface the URI for the app to render as a QR code or deep link.
+                    // Uses the late-bound handler (may have been overwritten by the modal).
+                    if (uri && onUriHandler)
+                        onUriHandler(uri);
+                    // Wait for the wallet to approve — NO TIMEOUT.
+                    // The user may take as long as they need to scan the QR code and
+                    // approve in their wallet. We only abort if:
+                    //   1. A fatal relay error fires (e.g. invalid projectId → "Project
+                    //      not found", relay unreachable, etc.)
+                    //   2. The user cancels (connectAborted is set by the caller)
+                    // The abort promise rejects immediately when connectAborted becomes
+                    // true (checked every 200ms by the polling loop).
+                    const session = await Promise.race([
+                        approval(),
                         abortPromise,
                     ]).catch((err) => {
+                        // If the abort promise rejected, convert to ConnectError
                         if (err instanceof Error && err.message === '__WC_ABORTED__') {
-                            throw makeAbortError();
+                            const reason = fatalErrorMessage
+                                ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
+                                : 'WalletConnect connection aborted — relay error (check your projectId).';
+                            throw ConnectError.invalidRequest(reason, undefined, meta.id);
                         }
                         throw err;
                     });
-                    uri = result.uri;
-                    approval = result.approval;
-                }
-                catch (err) {
-                    // The connect() call itself can fail with a fatal relay error
-                    // (e.g. "Project not found") — detect and surface it.
-                    if (isFatalRelayError(err)) {
-                        teardownClient();
-                        throw ConnectError.invalidRequest(`WalletConnect relay error: ${err instanceof Error ? err.message : String(err)}. ` +
-                            'Check your projectId at cloud.walletconnect.com.', undefined, meta.id);
-                    }
-                    if (err instanceof ConnectError)
-                        throw err;
-                    throw err;
-                }
-                if (connectAborted) {
-                    throw makeAbortError();
-                }
-                // Surface the URI for the app to render as a QR code or deep link.
-                // Uses the late-bound handler (may have been overwritten by the modal).
-                if (uri && onUriHandler)
-                    onUriHandler(uri);
-                // Wait for the wallet to approve — NO TIMEOUT.
-                // The user may take as long as they need to scan the QR code and
-                // approve in their wallet. We only abort if:
-                //   1. A fatal relay error fires (e.g. invalid projectId → "Project
-                //      not found", relay unreachable, etc.)
-                //   2. The user cancels (connectAborted is set by the caller)
-                // The abort promise rejects immediately when connectAborted becomes
-                // true (checked every 200ms by the polling loop).
-                const session = await Promise.race([
-                    approval(),
-                    abortPromise,
-                ]).catch((err) => {
-                    // If the abort promise rejected, convert to ConnectError
-                    if (err instanceof Error && err.message === '__WC_ABORTED__') {
+                    if (connectAborted) {
                         const reason = fatalErrorMessage
                             ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
                             : 'WalletConnect connection aborted — relay error (check your projectId).';
                         throw ConnectError.invalidRequest(reason, undefined, meta.id);
                     }
-                    throw err;
-                });
-                if (connectAborted) {
-                    const reason = fatalErrorMessage
-                        ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
-                        : 'WalletConnect connection aborted — relay error (check your projectId).';
-                    throw ConnectError.invalidRequest(reason, undefined, meta.id);
-                }
-                sessionTopic = session.topic;
-                // Capture the peer wallet's metadata — the REAL wallet name and icon
-                // ("Freighter", "LOBSTR", "HOT Wallet", ...), not the generic
-                // "WalletConnect" label. Every WC wallet sends this on session settle;
-                // the UI reads it via getSessionPeer() to brand the connecting/account
-                // views after the user picked a specific wallet.
-                const peer = session.peer?.metadata;
-                if (peer?.name) {
-                    peerMetadata = {
-                        name: peer.name,
-                        url: peer.url || null,
-                        icon: peer.icons?.[0] || null,
+                    sessionTopic = session.topic;
+                    // Capture the peer wallet's metadata — the REAL wallet name and icon
+                    // ("Freighter", "LOBSTR", "HOT Wallet", ...), not the generic
+                    // "WalletConnect" label. Every WC wallet sends this on session settle;
+                    // the UI reads it via getSessionPeer() to brand the connecting/account
+                    // views after the user picked a specific wallet.
+                    const peer = session.peer?.metadata;
+                    if (peer?.name) {
+                        peerMetadata = {
+                            name: peer.name,
+                            url: peer.url || null,
+                            icon: peer.icons?.[0] || null,
+                        };
+                    }
+                    else {
+                        peerMetadata = null;
+                    }
+                    // Extract the address from the session's namespace accounts.
+                    // WC account format: "stellar:<networkPassphrase>:<address>"
+                    const stellarNamespace = session.namespaces?.stellar;
+                    if (!stellarNamespace?.accounts?.length) {
+                        throw ConnectError.internal('WalletConnect session established but no Stellar account was provided by the wallet.', undefined, meta.id);
+                    }
+                    const accountStr = stellarNamespace.accounts[0] ?? '';
+                    const parts = accountStr.split(':');
+                    cachedAddress = parts[parts.length - 1] ?? null; // last segment is the address
+                    // Capture the methods the wallet actually approved — every request()
+                    // below is pre-checked against this set so we never trigger the
+                    // sign-client's namespace-validation errors.
+                    grantedMethods = new Set(stellarNamespace.methods ?? []);
+                    // Verify the wallet approved the base signing method.
+                    // signTransaction() speaks stellar_signXDR; a session without it
+                    // can't sign anything for us, so fail now with a clear error
+                    // instead of a cryptic namespace-validation error on the first
+                    // sign request. (Recommended by the Freighter Mobile WC docs.)
+                    if (!grantedMethods.has('stellar_signXDR')) {
+                        throw ConnectError.internal('WalletConnect session established but the wallet did not approve the ' +
+                            `stellar_signXDR method (approved methods: ${[...grantedMethods].join(', ') || 'none'}). ` +
+                            'Reconnect with a wallet that supports Stellar WalletConnect signing.', undefined, meta.id);
+                    }
+                    // Try to get the network from the wallet — but only when the
+                    // settled session actually approved stellar_getNetwork. Most
+                    // Stellar WC wallets (Freighter Mobile included — see
+                    // docs.freighter.app) implement only the four signing methods, and
+                    // newer sign-client releases validate every request() method
+                    // against the session namespaces, logging ERROR + throwing
+                    // "Missing or invalid. request() method: stellar_getNetwork" for
+                    // methods that were never approved. When the method wasn't
+                    // approved we skip the request entirely and fall back to the
+                    // app's configured network — same outcome, zero error noise.
+                    const configuredPassphrase = resolveNetworkPassphrase();
+                    const configuredNetwork = appkitNetwork ?? 'TESTNET';
+                    const useConfiguredNetwork = () => {
+                        cachedNetwork = {
+                            network: configuredNetwork,
+                            networkPassphrase: configuredPassphrase,
+                        };
                     };
-                }
-                else {
-                    peerMetadata = null;
-                }
-                // Extract the address from the session's namespace accounts.
-                // WC account format: "stellar:<networkPassphrase>:<address>"
-                const stellarNamespace = session.namespaces?.stellar;
-                if (!stellarNamespace?.accounts?.length) {
-                    throw ConnectError.internal('WalletConnect session established but no Stellar account was provided by the wallet.', undefined, meta.id);
-                }
-                const accountStr = stellarNamespace.accounts[0] ?? '';
-                const parts = accountStr.split(':');
-                cachedAddress = parts[parts.length - 1] ?? null; // last segment is the address
-                // Capture the methods the wallet actually approved — every request()
-                // below is pre-checked against this set so we never trigger the
-                // sign-client's namespace-validation errors.
-                grantedMethods = new Set(stellarNamespace.methods ?? []);
-                // Verify the wallet approved the base signing method.
-                // signTransaction() speaks stellar_signXDR; a session without it
-                // can't sign anything for us, so fail now with a clear error
-                // instead of a cryptic namespace-validation error on the first
-                // sign request. (Recommended by the Freighter Mobile WC docs.)
-                if (!grantedMethods.has('stellar_signXDR')) {
-                    throw ConnectError.internal('WalletConnect session established but the wallet did not approve the ' +
-                        `stellar_signXDR method (approved methods: ${[...grantedMethods].join(', ') || 'none'}). ` +
-                        'Reconnect with a wallet that supports Stellar WalletConnect signing.', undefined, meta.id);
-                }
-                // Try to get the network from the wallet — but only when the
-                // settled session actually approved stellar_getNetwork. Most
-                // Stellar WC wallets (Freighter Mobile included — see
-                // docs.freighter.app) implement only the four signing methods, and
-                // newer sign-client releases validate every request() method
-                // against the session namespaces, logging ERROR + throwing
-                // "Missing or invalid. request() method: stellar_getNetwork" for
-                // methods that were never approved. When the method wasn't
-                // approved we skip the request entirely and fall back to the
-                // app's configured network — same outcome, zero error noise.
-                const configuredPassphrase = resolveNetworkPassphrase();
-                const configuredNetwork = appkitNetwork ?? 'TESTNET';
-                const useConfiguredNetwork = () => {
-                    cachedNetwork = {
-                        network: configuredNetwork,
-                        networkPassphrase: configuredPassphrase,
-                    };
-                };
-                if (!grantedMethods.has('stellar_getNetwork')) {
-                    // Wallet didn't approve stellar_getNetwork — use the app's
-                    // configured network. This is the most common case.
-                    useConfiguredNetwork();
-                }
-                else {
-                    try {
-                        const networkResult = await wc.request({
-                            topic: sessionTopic,
-                            chainId: resolveWcChainId(),
-                            request: { method: 'stellar_getNetwork', params: {} },
-                        });
-                        if (networkResult?.networkPassphrase) {
-                            cachedNetwork = {
-                                network: networkResult.network ?? configuredNetwork,
-                                networkPassphrase: networkResult.networkPassphrase,
-                            };
+                    if (!grantedMethods.has('stellar_getNetwork')) {
+                        // Wallet didn't approve stellar_getNetwork — use the app's
+                        // configured network. This is the most common case.
+                        useConfiguredNetwork();
+                    }
+                    else {
+                        try {
+                            const networkResult = await wc.request({
+                                topic: sessionTopic,
+                                chainId: resolveWcChainId(),
+                                request: { method: 'stellar_getNetwork', params: {} },
+                            });
+                            if (networkResult?.networkPassphrase) {
+                                cachedNetwork = {
+                                    network: networkResult.network ?? configuredNetwork,
+                                    networkPassphrase: networkResult.networkPassphrase,
+                                };
+                            }
+                            else {
+                                // Wallet responded but didn't include networkPassphrase
+                                useConfiguredNetwork();
+                            }
                         }
-                        else {
-                            // Wallet responded but didn't include networkPassphrase
+                        catch {
+                            // The method was approved but the round-trip failed (timeout,
+                            // wallet error) — fall back to the app's configured network.
                             useConfiguredNetwork();
                         }
                     }
-                    catch {
-                        // The method was approved but the round-trip failed (timeout,
-                        // wallet error) — fall back to the app's configured network.
-                        useConfiguredNetwork();
+                    // Persist the session topic for restore on reload
+                    if (opts.storage) {
+                        await opts.storage.setItem(WC_STORAGE_KEY, JSON.stringify({
+                            topic: sessionTopic,
+                            address: cachedAddress,
+                            peerMetadata,
+                        }));
                     }
-                }
-                // Persist the session topic for restore on reload
-                if (opts.storage) {
-                    await opts.storage.setItem(WC_STORAGE_KEY, JSON.stringify({
-                        topic: sessionTopic,
-                        address: cachedAddress,
-                        peerMetadata,
-                    }));
-                }
-                return { address: cachedAddress, walletId: meta.id };
-            });
+                    return { address: cachedAddress, walletId: meta.id };
+                });
+            }
+            finally {
+                stopAbortPoll = true;
+                connectInFlight = false;
+            }
         },
         async disconnect() {
             if (client && sessionTopic) {
@@ -661,11 +875,20 @@ export function createWalletConnectConnector(opts) {
         },
         async getAddress() {
             if (!cachedAddress) {
+                // Cold start — a persisted session may exist (see restoreFromStorage).
+                // Rehydrate before deciding we're not connected; StellarAppKit's
+                // restore() validates sessions through this very call.
+                await restoreFromStorage();
+            }
+            if (!cachedAddress) {
                 throw ConnectError.invalidRequest('WalletConnect is not connected — call connect() first.', undefined, meta.id);
             }
             return { address: cachedAddress };
         },
         async getNetwork() {
+            if (!cachedNetwork) {
+                await restoreFromStorage();
+            }
             if (!cachedNetwork) {
                 throw ConnectError.invalidRequest('WalletConnect is not connected — call connect() first.', undefined, meta.id);
             }

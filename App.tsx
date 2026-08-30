@@ -39,7 +39,7 @@ function isDarkColor(hex: string): boolean {
 }
 
 function Root() {
-  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation, browser } = useAppKitDemo();
+  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation, browser, autoCloseOnComplete } = useAppKitDemo();
   return (
     <View style={[styles.root, { backgroundColor: theme.colorBg }]}>
       <StatusBar style={isDarkColor(theme.colorBg) ? 'light' : 'dark'} />
@@ -53,7 +53,14 @@ function Root() {
           themed Chrome Custom Tab / SFSafariViewController instead of
           leaving the app. */}
       {presentation === 'bottomsheet' && (
-        <AppKitModal client={client} open={modalOpen} onClose={closeModal} theme={theme} browser={browser} />
+        <AppKitModal
+          client={client}
+          open={modalOpen}
+          onClose={closeModal}
+          theme={theme}
+          browser={browser}
+          autoCloseOnComplete={autoCloseOnComplete}
+        />
       )}
 
       {/* Albedo + xBull WebView screens (rendered on demand by the bridges). */}

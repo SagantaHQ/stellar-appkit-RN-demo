@@ -72,6 +72,11 @@ const sv = {
         "disconnect": "Koppla från",
         "connect_wallet": "Anslut plånbok"
     },
+    "browser": {
+        "reload": "Uppdatera",
+        "open_in_browser": "Öppna i webbläsaren",
+        "copy_link": "Kopiera länk"
+    },
     "wallet": {
         "fallback_name": "Plånbok",
         "fallback_your_wallet": "din plånbok"

@@ -93,6 +93,12 @@ export const en = {
         disconnect: 'Disconnect',
         connect_wallet: 'Connect wallet',
     },
+    /** In-app WebView toolbar (RN — Albedo/xBull screens) */
+    browser: {
+        reload: 'Reload',
+        open_in_browser: 'Open in browser',
+        copy_link: 'Copy link',
+    },
     /** Wallet name fallbacks */
     wallet: {
         fallback_name: 'Wallet',

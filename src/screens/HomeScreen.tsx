@@ -75,6 +75,8 @@ export function HomeScreen() {
     setAppLocale,
     siwsEnabled,
     setSiwsEnabled,
+    autoCloseOnComplete,
+    setAutoCloseOnComplete,
     browser,
   } = useAppKitDemo();
   const state = useAppKit(client);
@@ -326,9 +328,40 @@ export function HomeScreen() {
         </View>
       </Card>
 
+      {/* auto-minimize — the sheet dismisses itself when the operation completes */}
+      <Card theme={theme}>
+        <BodyText theme={theme} style={{ fontWeight: '700' }}>
+          Auto-minimize on completion
+        </BodyText>
+        <MutedText theme={theme}>
+          The mobile deep-link pattern: approve in the wallet app (connect or signing), return, and after a
+          short “connected” flash the sheet dismisses itself — focus lands back on this screen, no extra
+          tap. Rejections and errors never auto-close (you still get the retry pill), and reopening the
+          modal for account management never dismisses it. Toggle off for the web modal&apos;s behavior —
+          the account view stays open until you close it.
+        </MutedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+          <Chip
+            theme={theme}
+            label="Auto-minimize"
+            active={autoCloseOnComplete}
+            accent={theme.colorAccent}
+            onPress={() => setAutoCloseOnComplete(!autoCloseOnComplete)}
+          />
+        </View>
+      </Card>
+
       {/* inline presentation — the modal embedded in the page (web mode="inline") */}
       {presentation === 'inline' && (
-        <AppKitModal client={client} mode="inline" open onClose={() => {}} theme={theme} browser={browser} />
+        <AppKitModal
+          client={client}
+          mode="inline"
+          open
+          onClose={() => {}}
+          theme={theme}
+          browser={browser}
+          autoCloseOnComplete={autoCloseOnComplete}
+        />
       )}
 
       {/* session / connect */}

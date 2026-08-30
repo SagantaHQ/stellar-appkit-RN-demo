@@ -112,6 +112,13 @@ which requires a project id:
   (Node's `crypto` is provided by `src/node-crypto-shim.js`, a `@noble/hashes`-backed
   createHash routed in `metro.config.js`). The session persists in `AsyncStorage` and
   the card shows the signed-in address + expiry with a Sign-out button.
+- **Auto-minimize on completion** — when the operation this app requested completes (approve the
+  connect in the wallet app and return, or let the wallet answer a sign request), the sheet
+  dismisses itself after a short “connected” flash and focus lands back on the demo screen — the
+  mobile deep-link pattern, no extra dismissal tap. Rejections/errors never auto-close (the retry
+  pill stays), every user navigation disarms it, and a reopened modal never self-closes. An
+  “Auto-minimize on completion” card toggles the modal's `autoCloseOnComplete` prop — off gives
+  the web modal's stay-open account view.
 - **Themed in-app browser** — a new "In-app browser" card + every web link in the
   modal (explorer, wallet install pages, the footer) opens in a themed Chrome Custom
   Tab / SFSafariViewController — modal `pageSheet` on iOS, themed toolbars on Android —
@@ -143,7 +150,7 @@ The interesting files, in the order the app loads them:
 | `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` at the root. |
 | `src/stellar.ts` | Demo Stellar helpers — plain Horizon `fetch` for account/balance, stellar-sdk XDR builders, `submitSignedTx()` (REST submit), friendbot faucet, SIWS nonce (AppKit signs; building/submitting XDR is your app's job). |
 | `src/node-crypto-shim.js` | `createHash('sha256'/'sha512')` via `@noble/hashes` — stands in for Node's `crypto` so `siws-verify` runs on-device (routed in metro.config.js). |
-| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, sign (message + self-payment), send XLM (sign + submit), SIWS, in-app browser, friendbot, theme. |
+| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, auto-minimize toggle, sign (message + self-payment), send XLM (sign + submit), SIWS, in-app browser, friendbot, theme. |
 | `scripts/test-siws-e2e.mjs` | Node-run e2e proof of the SIWS verification path (valid sign-in, wrong nonce/domain, foreign signature, SEP-0053 hashed signing). |
 | `metro.config.js` | Five Expo Go-specific resolver tweaks (see below). |
 

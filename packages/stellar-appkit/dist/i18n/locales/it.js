@@ -72,6 +72,11 @@ const it = {
         "disconnect": "Disconnetti",
         "connect_wallet": "Connetti wallet"
     },
+    "browser": {
+        "reload": "Ricarica",
+        "open_in_browser": "Apri nel browser",
+        "copy_link": "Copia link"
+    },
     "wallet": {
         "fallback_name": "Wallet",
         "fallback_your_wallet": "il tuo wallet"

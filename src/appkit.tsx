@@ -147,6 +147,15 @@ interface AppKitDemoContextValue {
   siwsEnabled: boolean;
   setSiwsEnabled: (on: boolean) => void;
   /**
+   * Auto-minimize toggle — the modal's `autoCloseOnComplete` prop: when the
+   * operation the app requested completes (connect settles after the
+   * deep-link return, or the sign queue drains cleanly), the sheet
+   * dismisses itself after a short confirmation flash and focus returns
+   * to this screen. Off = the web modal's stay-open account view.
+   */
+  autoCloseOnComplete: boolean;
+  setAutoCloseOnComplete: (on: boolean) => void;
+  /**
    * The themed in-app browser (Chrome Custom Tabs / SFSafariViewController,
    * styled like a modal from the active theme). Passed to the modal so
    * explorer/install/footer links open in-app, and usable directly.
@@ -164,6 +173,7 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
   const [presentation, setPresentation] = useState<'bottomsheet' | 'inline'>('bottomsheet');
   const [locale, setLocaleState] = useState<LocaleCode>(getLocale());
   const [siwsEnabled, setSiwsEnabled] = useState(false);
+  const [autoCloseOnComplete, setAutoCloseOnComplete] = useState(true);
 
   // Follow the device language at startup — unsupported languages keep
   // English. The switcher below can then override at any time.
@@ -344,9 +354,11 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       setAppLocale,
       siwsEnabled,
       setSiwsEnabled,
+      autoCloseOnComplete,
+      setAutoCloseOnComplete,
       browser,
     }),
-    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, browser]
+    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, autoCloseOnComplete, browser]
   );
 
   return <AppKitDemoContext.Provider value={value}>{children}</AppKitDemoContext.Provider>;

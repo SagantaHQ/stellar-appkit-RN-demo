@@ -8,6 +8,10 @@
  * - `createAsyncStorage()` — AsyncStorage-backed `ConnectStorage`
  * - deep-link registry — MWA-style wallet handoff (`freighterwallet://wc-redirect/wc?uri=...`)
  * - `isReactNativeRuntime()` — real RN detection (RN defines `window`!)
+ * - `attachWalletConnectForegroundRefresh()` — headless zombie-socket fix:
+ *   restarts the WC relay on every AppState 'active' so pairing/sign
+ *   approvals that settled while the app was backgrounded (behind the
+ *   wallet app) actually get delivered
  *
  * UI (modal) lives in `@saganta/stellar-appkit-react-native/ui`, polyfills in
  * `@saganta/stellar-appkit-react-native/polyfills`, the Albedo WebView screen
@@ -19,6 +23,7 @@ export { defaultReactNativeConnectors, createAlbedoWebViewConnector, createXBull
 export { createAsyncStorage, createMemoryStorage, } from './storage.js';
 export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';
+export { attachWalletConnectForegroundRefresh, } from './wc-foreground.js';
 export { detectDeviceLocale, applyDeviceLocale, normalizeToDeviceLocale, } from './locale.js';
 export { createThemedBrowserSession, buildRebornOptions, buildExpoOptions, } from './browser/inapp-browser.js';
 //# sourceMappingURL=index.js.map

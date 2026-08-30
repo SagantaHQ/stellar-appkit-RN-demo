@@ -27,10 +27,15 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  *  see the connector); the WebView never sees plaintext requests.
  * - One operation per screen instance — the connector closes the WebView
  *  after each request cycle, mirroring the web SDK's popup lifecycle.
+ *
+ * The screen carries a browser toolbar (WebViewToolbar): the current URL
+ * chip with tap-to-copy, Reload, and Open-in-browser — the browser
+ * affordances a bare WebView lacks.
  */
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { WebViewToolbar } from '../browser/WebViewToolbar.js';
 /**
  * Creates the bridge object to pass to `createXBullWebViewConnector()` /
  * `defaultReactNativeConnectors({ xbullBridge })`. One active wallet screen
@@ -54,6 +59,7 @@ export function createXBullWebViewBridge(render) {
 export function XBullWebViewScreen({ url, onMessage, onClosed, onReady, onUnmount, dark = true, }) {
     const webviewRef = useRef(null);
     const [loaded, setLoaded] = useState(false);
+    const [currentUrl, setCurrentUrl] = useState(url);
     /** Guard: dismissal (user cancel, connector close) must fire exactly once. */
     const dismissedRef = useRef(false);
     /** Guard: the handle is published exactly once per screen instance. */
@@ -118,20 +124,20 @@ export function XBullWebViewScreen({ url, onMessage, onClosed, onReady, onUnmoun
         // itself to /connect/no-wallet, /create-account, … — same origin, fine.
         return nav.url.startsWith('https://wallet.xbull.app/');
     }, []);
-    return (_jsx(Modal, { visible: true, animationType: "slide", onRequestClose: () => dismiss(true), children: _jsxs(View, { style: [styles.container, { backgroundColor: bg }], children: [_jsxs(View, { style: styles.header, children: [_jsx(Pressable, { onPress: () => dismiss(true), hitSlop: 12, children: _jsx(Text, { style: { color: fg, fontSize: 15, fontWeight: '600' }, children: "Cancel" }) }), _jsx(Text, { style: { color: fg, fontSize: 15, fontWeight: '700' }, children: "xBull Wallet" }), _jsx(View, { style: { width: 48 } })] }), _jsx(WebView, { ref: (r) => {
+    // Navigation tracking feeds the toolbar's URL chip (and re-arms the
+    // loading veil on every fresh page load).
+    const handleNavigationState = useCallback((nav) => {
+        setCurrentUrl(nav.url);
+        if (nav.loading)
+            setLoaded(false);
+    }, []);
+    return (_jsx(Modal, { visible: true, animationType: "slide", onRequestClose: () => dismiss(true), children: _jsxs(View, { style: [styles.container, { backgroundColor: bg }], children: [_jsx(WebViewToolbar, { url: currentUrl, dark: dark, onCancel: () => dismiss(true), onReload: () => webviewRef.current?.reload() }), _jsx(WebView, { ref: (r) => {
                         webviewRef.current = r;
                         publishHandle();
-                    }, source: { uri: url }, injectedJavaScriptBeforeContentLoaded: openerShim, onMessage: handleMessage, onShouldStartLoadWithRequest: guardNavigation, onLoadStart: () => publishHandle(), onLoadEnd: () => setLoaded(true), javaScriptEnabled: true, domStorageEnabled: true, setSupportMultipleWindows: false, allowsBackForwardNavigationGestures: false, renderLoading: () => (_jsx(View, { style: [styles.loader, { backgroundColor: bg }], children: _jsx(ActivityIndicator, {}) })) }), !loaded && (_jsxs(View, { style: [styles.loader, { backgroundColor: bg }], pointerEvents: "none", children: [_jsx(ActivityIndicator, {}), _jsx(Text, { style: { color: fg, marginTop: 8 }, children: "Opening xBull\u2026" })] }))] }) }));
+                    }, source: { uri: url }, injectedJavaScriptBeforeContentLoaded: openerShim, onMessage: handleMessage, onShouldStartLoadWithRequest: guardNavigation, onNavigationStateChange: handleNavigationState, onLoadStart: () => publishHandle(), onLoadEnd: () => setLoaded(true), javaScriptEnabled: true, domStorageEnabled: true, setSupportMultipleWindows: false, allowsBackForwardNavigationGestures: false, textInteractionEnabled: true, renderLoading: () => (_jsx(View, { style: [styles.loader, { backgroundColor: bg }], children: _jsx(ActivityIndicator, {}) })) }), !loaded && (_jsxs(View, { style: [styles.loader, { backgroundColor: bg }], pointerEvents: "none", children: [_jsx(ActivityIndicator, {}), _jsx(Text, { style: { color: fg, marginTop: 8 }, children: "Opening xBull\u2026" })] }))] }) }));
 }
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
     loader: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
 });
 //# sourceMappingURL=XBullWebViewScreen.js.map

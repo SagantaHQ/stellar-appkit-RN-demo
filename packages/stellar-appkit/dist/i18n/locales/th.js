@@ -72,6 +72,11 @@ const th = {
         "disconnect": "ยกเลิกการเชื่อมต่อ",
         "connect_wallet": "เชื่อมต่อกระเป๋า"
     },
+    "browser": {
+        "reload": "โหลดใหม่",
+        "open_in_browser": "เปิดในเบราว์เซอร์",
+        "copy_link": "คัดลอกลิงก์"
+    },
     "wallet": {
         "fallback_name": "กระเป๋า",
         "fallback_your_wallet": "กระเป๋าของคุณ"

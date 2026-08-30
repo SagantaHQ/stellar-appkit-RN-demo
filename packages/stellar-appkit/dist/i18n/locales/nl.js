@@ -72,6 +72,11 @@ const nl = {
         "disconnect": "Verbreken",
         "connect_wallet": "Portemonnee verbinden"
     },
+    "browser": {
+        "reload": "Herladen",
+        "open_in_browser": "Openen in browser",
+        "copy_link": "Link kopiëren"
+    },
     "wallet": {
         "fallback_name": "Portemonnee",
         "fallback_your_wallet": "je portemonnee"

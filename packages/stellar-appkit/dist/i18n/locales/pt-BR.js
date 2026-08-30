@@ -72,6 +72,11 @@ const pt_BR = {
         "disconnect": "Desconectar",
         "connect_wallet": "Conectar carteira"
     },
+    "browser": {
+        "reload": "Recarregar",
+        "open_in_browser": "Abrir no navegador",
+        "copy_link": "Copiar link"
+    },
     "wallet": {
         "fallback_name": "Carteira",
         "fallback_your_wallet": "sua carteira"

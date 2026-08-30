@@ -13,6 +13,11 @@
  *     `window.open(...).postMessage(params, '*')` would have delivered.
  *  3. The user confirms in Albedo's own UI; the result arrives at our shim.
  *
+ * The screen carries a browser toolbar (WebViewToolbar): the current URL
+ * chip with tap-to-copy, Reload, and Open-in-browser — the browser
+ * affordances a bare WebView lacks. Reload restarts the handshake: the
+ * fresh page re-signals readiness and the intent params are re-delivered.
+ *
  * Security notes:
  * - The WebView is locked to `https://albedo.link/` (navigation guard).
  * - `origin` is sent with the intent so Albedo can display the requesting

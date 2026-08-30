@@ -72,6 +72,11 @@ const ro = {
         "disconnect": "Deconectează",
         "connect_wallet": "Conectează portofel"
     },
+    "browser": {
+        "reload": "Reîncarcă",
+        "open_in_browser": "Deschide în browser",
+        "copy_link": "Copiază linkul"
+    },
     "wallet": {
         "fallback_name": "Portofel",
         "fallback_your_wallet": "portofelul tău"
