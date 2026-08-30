@@ -15,7 +15,7 @@
  * apps only bundle what they import.
  */
 export * from '@saganta/stellar-appkit';
-export { defaultReactNativeConnectors, createAlbedoWebViewConnector, type ReactNativeConnectorsOptions, type AlbedoWebViewBridge, type AlbedoWebViewConnectorOptions, ALBEDO_FRONTEND_URL, } from './connectors/index.js';
+export { defaultReactNativeConnectors, createAlbedoWebViewConnector, createXBullWebViewConnector, XBULL_WALLET_URL, type ReactNativeConnectorsOptions, type AlbedoWebViewBridge, type AlbedoWebViewConnectorOptions, type XBullWebViewBridge, type XBullWalletHandle, type XBullWalletMessage, type XBullWebViewConnectorOptions, ALBEDO_FRONTEND_URL, } from './connectors/index.js';
 export { createAsyncStorage, createMemoryStorage, type KeyValueLikeStorage, } from './storage.js';
 export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, type MobileWalletDeepLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';

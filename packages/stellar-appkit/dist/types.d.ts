@@ -199,6 +199,18 @@ export interface WalletConnector {
     /** Switches which of listAccounts()'s addresses subsequent sign/getAddress calls act on. Only meaningful alongside listAccounts. */
     selectAccount?(address: string): Promise<void>;
     /**
+     * Optional: eagerly initializes the connector's expensive machinery so a
+     * later `connect()` starts instantly. The WalletConnect connector
+     * implements this (dynamic SDK import + relay WebSocket handshake — the
+     * cold-start cost that otherwise lands on the user's first tap, which on
+     * React Native manifests as a multi-second freeze).
+     *
+     * Idempotent and safe to call repeatedly; implementations must swallow
+     * errors (a failed warm-up leaves the connector cold — the next
+     * `connect()` retries initialization and surfaces the real error).
+     */
+    warmUp?(): Promise<void>;
+    /**
      * Optional: returns the connected wallet's own identity as reported by
      * relay-based connectors (WalletConnect) — the real wallet name and icon
      * ("Freighter", "LOBSTR", "HOT Wallet") rather than the connector's

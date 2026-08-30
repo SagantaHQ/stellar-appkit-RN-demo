@@ -151,6 +151,15 @@ export function createWalletConnectConnector(opts) {
         submit: false, // we use stellar_signXDR (sign only), not stellar_signAndSubmitXDR
     };
     let client = null;
+    /**
+     * In-flight (or resolved) `SignClient.init()` promise — memoized so that
+     * concurrent callers (a background `warmUp()` racing a user-initiated
+     * `connect()`) share ONE initialization instead of each evaluating the
+     * `@walletconnect/sign-client` module tree and opening its own relay
+     * WebSocket. Nulled on failure (so the next call retries) and by
+     * `teardownClient()`.
+     */
+    let clientInitPromise = null;
     let sessionTopic = null;
     let cachedAddress = null;
     let cachedNetwork = null;
@@ -225,12 +234,14 @@ export function createWalletConnectConnector(opts) {
             // Ignore — best-effort cleanup
         }
         client = null;
+        clientInitPromise = null;
         sessionTopic = null;
     }
     /**
      * Lazy-imports @walletconnect/sign-client and initializes the SignClient
      * (if not already done). The client is a singleton — we only init once
-     * per connector instance.
+     * per connector instance. Concurrent callers await the same in-flight
+     * promise (see `clientInitPromise`).
      */
     async function ensureClient() {
         if (client)
@@ -238,6 +249,18 @@ export function createWalletConnectConnector(opts) {
         if (connectAborted) {
             throw ConnectError.rejected(meta.id);
         }
+        if (!clientInitPromise) {
+            // Reset on failure so a later connect()/warmUp() retries instead of
+            // caching a rejection forever.
+            clientInitPromise = initClient().catch((err) => {
+                clientInitPromise = null;
+                throw err;
+            });
+        }
+        return clientInitPromise;
+    }
+    /** The one-shot init: dynamic import + SignClient.init + event wiring. */
+    async function initClient() {
         try {
             // @walletconnect/sign-client v2 exports SignClient as a named export
             // (mod.SignClient), NOT as the default export. The default export is
@@ -364,6 +387,31 @@ export function createWalletConnectConnector(opts) {
             // WalletConnect is always "available" if a projectId is configured —
             // the relay is a cloud service, not an installed extension.
             return opts.projectId ? 'available' : 'unavailable';
+        },
+        /**
+         * Pre-initializes the WalletConnect SignClient: evaluates the
+         * `@walletconnect/sign-client` module tree and opens the relay WebSocket
+         * so a later `connect()` starts instantly.
+         *
+         * Why this matters on React Native: the first `connect()` otherwise pays
+         * the entire cold-start cost on the tap — Metro evaluates the WC SDK
+         * module tree (hundreds of modules, seconds on a debug build, blocking
+         * the JS thread) and `SignClient.init()` then awaits the relay WebSocket
+         * handshake. Users perceive a multi-second dead freeze between tapping
+         * a wallet and anything happening. Calling `warmUp()` at app start (or
+         * when the wallet picker opens) moves all of that off the interaction.
+         *
+         * Errors are swallowed by design — a failed warm-up (e.g. offline) leaves
+         * the connector cold, and the next `connect()` retries the init and
+         * surfaces the real error to the user.
+         */
+        async warmUp() {
+            try {
+                await ensureClient();
+            }
+            catch {
+                // Silent by design — see doc comment above.
+            }
         },
         async connect(_connectOpts) {
             return withNormalizedError(meta.id, async () => {

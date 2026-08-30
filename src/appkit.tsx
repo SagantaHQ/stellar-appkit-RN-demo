@@ -1,19 +1,22 @@
 /**
  * AppKit provider — creates the StellarAppKit client once, owns the modal
- * open/close state, the Albedo WebView bridge, and the theme selection.
+ * open/close state, the Albedo + xBull WebView bridges, and the theme
+ * selection.
  *
  * Connector assembly:
  * - With EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID set:
- *     `defaultReactNativeConnectors()` → WalletConnect relay + Albedo WebView.
- *     The modal offers Freighter Mobile via deep link first, QR fallback for
- *     every other WalletConnect wallet (LOBSTR, etc.).
- * - Without it: the Albedo WebView connector alone, so the demo still runs
- *   end-to-end (connect → sign) with zero configuration.
+ *     `defaultReactNativeConnectors()` → WalletConnect relay + Albedo
+ *     WebView + xBull WebView. The modal offers Freighter Mobile via deep
+ *     link first, QR fallback for every other WalletConnect wallet (LOBSTR,
+ *     etc.).
+ * - Without it: the Albedo + xBull WebView connectors alone, so the demo
+ *   still runs end-to-end (connect → sign) with zero configuration.
  */
 import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactElement,
@@ -23,10 +26,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   StellarAppKit,
   createAlbedoWebViewConnector,
+  createXBullWebViewConnector,
   createAsyncStorage,
   defaultReactNativeConnectors,
 } from '@saganta/stellar-appkit-react-native';
 import { createAlbedoWebViewBridge } from '@saganta/stellar-appkit-react-native/albedo';
+import { createXBullWebViewBridge } from '@saganta/stellar-appkit-react-native/xbull';
 import {
   minimalDark,
   minimalLight,
@@ -70,6 +75,8 @@ interface AppKitDemoContextValue {
   closeModal: () => void;
   /** The Albedo WebView screen — MUST be rendered at the app root. */
   albedoView: ReactElement | null;
+  /** The xBull web-wallet screen — MUST be rendered at the app root. */
+  xbullView: ReactElement | null;
   /** True when EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID is set. */
   walletConnectConfigured: boolean;
   /** Currently selected modal theme (also drives the app chrome). */
@@ -86,12 +93,16 @@ const AppKitDemoContext = createContext<AppKitDemoContextValue | null>(null);
 export function AppKitProvider({ children }: { children: ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [albedoView, setAlbedoView] = useState<ReactElement | null>(null);
+  const [xbullView, setXBullView] = useState<ReactElement | null>(null);
   const [themeId, setThemeId] = useState('stellarDark');
   const [presentation, setPresentation] = useState<'bottomsheet' | 'inline'>('bottomsheet');
 
   // The bridge renders Albedo's confirm page into a state-held element;
   // created exactly once.
   const albedoBridge = useMemo(() => createAlbedoWebViewBridge(setAlbedoView), []);
+  // Same pattern for xBull — the web wallet (wallet.xbull.app) speaks a
+  // nacl-box popup protocol that the bridge reproduces inside a WebView.
+  const xbullBridge = useMemo(() => createXBullWebViewBridge(setXBullView), []);
 
   const client = useMemo(() => {
     const connectors = WC_PROJECT_ID
@@ -99,10 +110,13 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
           projectId: WC_PROJECT_ID,
           albedoBridge,
           albedoOrigin: APP_URL,
+          xbullBridge,
+          xbullOrigin: APP_URL,
         })
       : [
-          // No WalletConnect project id — demo mode: Albedo only.
+          // No WalletConnect project id — demo mode: Albedo + xBull only.
           createAlbedoWebViewConnector({ bridge: albedoBridge, origin: APP_URL }),
+          createXBullWebViewConnector({ bridge: xbullBridge, origin: APP_URL }),
         ];
 
     return new StellarAppKit({
@@ -116,7 +130,17 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       storage: createAsyncStorage(AsyncStorage),
       connectors,
     });
-  }, [albedoBridge]);
+  }, [albedoBridge, xbullBridge]);
+
+  // Pre-warm WalletConnect at app start: the SignClient's module tree
+  // evaluation + relay WebSocket handshake then complete while the user is
+  // still on the home screen — instead of freezing the first wallet tap for
+  // seconds (warmUp is idempotent and swallows errors; a cold connector just
+  // retries on the user's tap). The modal warms again on open as a no-op
+  // safety net for apps that skip this.
+  useEffect(() => {
+    void client.registry.get('walletconnect')?.warmUp?.();
+  }, [client]);
 
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
@@ -133,6 +157,7 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       openModal,
       closeModal,
       albedoView,
+      xbullView,
       walletConnectConfigured: WC_PROJECT_ID.length > 0,
       theme,
       themeId,
@@ -140,7 +165,7 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       presentation,
       setPresentation,
     }),
-    [client, modalOpen, openModal, closeModal, albedoView, theme, themeId, presentation]
+    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation]
   );
 
   return <AppKitDemoContext.Provider value={value}>{children}</AppKitDemoContext.Provider>;

@@ -12,9 +12,10 @@
  * - In the "inline" presentation (web `mode="inline"` parity) the panel is
  *   embedded inside the HomeScreen scroll instead — no overlay at all — so
  *   the root renders nothing modal.
- * - `{albedoView}` renders the Albedo confirm WebView on demand — the bridge
- *   hands us a ready-made screen element; it must live at the app root so it
- *   can cover whatever is on screen.
+ * - `{albedoView}` renders the Albedo confirm WebView on demand and
+ *   `{xbullView}` the xBull web wallet — the bridges hand us ready-made
+ *   screen elements; they must live at the app root so they can cover
+ *   whatever is on screen.
  */
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -38,7 +39,7 @@ function isDarkColor(hex: string): boolean {
 }
 
 function Root() {
-  const { client, modalOpen, closeModal, albedoView, theme, presentation } = useAppKitDemo();
+  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation } = useAppKitDemo();
   return (
     <View style={[styles.root, { backgroundColor: theme.colorBg }]}>
       <StatusBar style={isDarkColor(theme.colorBg) ? 'light' : 'dark'} />
@@ -52,8 +53,9 @@ function Root() {
         <AppKitModal client={client} open={modalOpen} onClose={closeModal} theme={theme} />
       )}
 
-      {/* Albedo WebView screen (rendered on demand by the bridge). */}
+      {/* Albedo + xBull WebView screens (rendered on demand by the bridges). */}
       {albedoView}
+      {xbullView}
     </View>
   );
 }

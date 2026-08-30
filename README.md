@@ -6,7 +6,7 @@ Stellar AppKit's wallet-connection layer running inside **Expo Go, with no nativ
 
 Connect a Stellar wallet — Freighter, LOBSTR, HOT Wallet or Scopuly straight from deep links,
 17 more WalletConnect-registered wallets (SafePal, Blockchain.com, Arculus, …) under "More wallets",
-Albedo through an in-app WebView — inspect the session,
+Albedo and xBull through in-app WebViews — inspect the session,
 sign a message, and sign a real TESTNET payment, all through the same themed bottom-sheet modal
 the web SDK ships. Every wallet shows its own name and icon end-to-end.
 
@@ -15,7 +15,7 @@ the web SDK ships. Every wallet shows its own name and icon end-to-end.
 | **Stack** | Expo SDK 57 · React Native 0.86 · React 19 · TypeScript (strict) |
 | **Runtime** | Expo Go — no `expo prebuild`, no Xcode/Android Studio, no EAS build required |
 | **Network** | Stellar TESTNET |
-| **Wallets** | Freighter · LOBSTR · HOT Wallet · Scopuly (featured deep links) · 17 more WC-registered wallets (SafePal, Blockchain.com, Arculus, …) · Albedo (WebView) |
+| **Wallets** | Freighter · LOBSTR · HOT Wallet · Scopuly (featured deep links) · 17 more WC-registered wallets (SafePal, Blockchain.com, Arculus, …) · Albedo (WebView) · xBull (WebView) |
 
 ---
 
@@ -103,8 +103,8 @@ The interesting files, in the order the app loads them:
 |---|---|
 | `index.ts` | Entry point — imports `./src/polyfills` **before** everything else. |
 | `src/polyfills.ts` | The Expo Go-safe polyfill dance (see below). |
-| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo WebView bridge, theme state. |
-| `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` at the root. |
+| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, the WalletConnect warm-up, theme state. |
+| `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` at the root. |
 | `src/stellar.ts` | Building the demo transaction — plain Horizon `fetch` + stellar-sdk (AppKit signs; building XDR is your app's job). |
 | `src/screens/HomeScreen.tsx` | The demo UI and both sign flows. |
 | `metro.config.js` | Four Expo Go-specific resolver tweaks (see below). |
