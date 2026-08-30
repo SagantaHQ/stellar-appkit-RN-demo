@@ -18,6 +18,18 @@
  *    `{variable}` interpolation, `{count, plural, ...}`, `{gender, select,
  *    ...}`, and proper number/date formatting for free.
  *
+ *    **Engine fallback** — `intl-messageformat` needs `Intl.PluralRules`
+ *    (among others) at *format* time. Hermes — the React Native JS engine —
+ *    ships `Intl.NumberFormat`/`Intl.DateTimeFormat` but NOT
+ *    `Intl.PluralRules`, so every plural message would throw and, without
+ *    this fallback, render as the raw `{count, plural, …}` pattern. When
+ *    construction OR formatting throws, `t()` re-formats the message with a
+ *    built-in zero-dependency ICU-subset formatter (`formatIcuFallback`)
+ *    that covers `{var}`, `{var, plural, …}` (with `#`, exact `=N` matches
+ *    and `offset:`), and `{var, select, …}`, using `Intl.PluralRules` when
+ *    available and a compact CLDR cardinal-rules table otherwise. On a
+ *    capable engine the fallback never runs — the output is identical.
+ *
  * 4. **Fallback chain** — if a key is missing from the active locale, we
  *    fall back to English. If it's missing from English too, we return the
  *    key itself (useful for debugging — you immediately see which key is
@@ -107,6 +119,11 @@ export declare function getLocale(): LocaleCode;
  *   - `{variable}` — simple interpolation
  *   - `{count, plural, one {item} other {items}}` — pluralization
  *   - `{gender, select, male {he} female {she} other {they}}` — selection
+ *
+ * On engines where `intl-messageformat` cannot run (most notably Hermes,
+ * which lacks `Intl.PluralRules`), formatting falls back to the built-in
+ * `formatIcuFallback()` — see its docblock. The user never sees a raw ICU
+ * pattern like `{count, plural, …}`.
  */
 export declare function t(key: string, values?: Record<string, unknown>): string;
 /**
@@ -133,5 +150,41 @@ export declare function preloadLocale(code: LocaleCode): Promise<void>;
  * language picker in your app's settings.
  */
 export declare function getSupportedLocales(): LocaleCode[];
+/**
+ * Zero-dependency ICU MessageFormat subset used when `intl-messageformat`
+ * cannot run — most importantly on Hermes (React Native), which ships
+ * `Intl.NumberFormat`/`Intl.DateTimeFormat` but NOT `Intl.PluralRules`, so
+ * `IntlMessageFormat#format()` throws
+ * "Intl.PluralRules is not available in this environment" for every plural
+ * message and the user would otherwise see the raw pattern
+ * (`{count, plural, one {…} other {…}}`).
+ *
+ * Supported syntax (everything our locale files use):
+ *   - `{name}`                       — simple interpolation
+ *   - `{name, plural, cat {…} …}`    — with `#` substitution, exact `=N`
+ *                                      branches and `offset: N`
+ *   - `{name, select, key {…} …}`    — keyword selection
+ *   - any other argument type        — plain `String(value)` degradation
+ *
+ * Plural categories come from `Intl.PluralRules` when the engine has it,
+ * otherwise from a compact CLDR cardinal-rules table covering every locale
+ * this package ships (see `cldrPluralCategory`). Malformed patterns degrade
+ * to emitting the raw segment — never a throw.
+ *
+ * Exported for tests (not part of the package's public index).
+ */
+export declare function formatIcuFallback(message: string, values: Record<string, unknown>, locale?: string): string;
+/**
+ * Picks a plural category: `Intl.PluralRules` when the engine provides it,
+ * otherwise the compact CLDR cardinal table below.
+ */
+export declare function selectPluralCategory(locale: string, n: number): string;
+/**
+ * Compact CLDR cardinal plural rules for every language this package ships
+ * a locale for (integers only — our plural values are counts). Used when
+ * `Intl.PluralRules` is unavailable (Hermes). Reference:
+ * cldr.unicode.org plural rules chart.
+ */
+export declare function cldrPluralCategory(lang: string, n: number): string;
 export {};
 //# sourceMappingURL=index.d.ts.map
