@@ -25,6 +25,91 @@ const FATAL_ERROR_PATTERNS = [
     /project quota exceeded/i,
     /unauthorized/i,
 ];
+/** Robustly extracts a human message from the shapes the WC SDK throws. */
+export function walletConnectErrorMessage(err) {
+    if (err instanceof Error)
+        return err.message;
+    if (typeof err === 'string')
+        return err;
+    if (err && typeof err === 'object') {
+        const e = err;
+        if (typeof e.message === 'string' && e.message)
+            return e.message;
+        if (typeof e.reason === 'string' && e.reason)
+            return e.reason;
+        if (typeof e.error === 'string')
+            return e.error;
+        if (e.error && typeof e.error === 'object' && typeof e.error.message === 'string')
+            return e.error.message;
+        try {
+            return JSON.stringify(err);
+        }
+        catch {
+            return 'Unknown WalletConnect error';
+        }
+    }
+    return String(err);
+}
+/** Wallet-speak for "the user said no" across the ecosystem's wallets. */
+const USER_REJECTION_PATTERNS = [
+    /cancel/i,
+    /reject/i,
+    /denied/i,
+    /declined/i,
+    /dismissed/i,
+    /user (?:said )?no/i,
+];
+/** The SDK's expiry phrasings — the delayed-promise timeout and the expirer. */
+const REQUEST_EXPIRY_PATTERNS = [
+    /request expired/i,
+    /expired\.? try again/i,
+    /expired request/i,
+    /session (?:proposal |request )?expired/i,
+];
+/**
+ * Classifies a WalletConnect error/rejection. Pure — safe to unit-test and
+ * to call from any path (never throws, never touches SDK state).
+ */
+export function classifyWalletConnectError(err) {
+    const message = walletConnectErrorMessage(err);
+    if (REQUEST_EXPIRY_PATTERNS.some((p) => p.test(message))) {
+        return { kind: 'request-expired', message };
+    }
+    if (USER_REJECTION_PATTERNS.some((p) => p.test(message))) {
+        return { kind: 'user-rejected', message };
+    }
+    return { kind: 'other', message };
+}
+/**
+ * Maps a classified WC failure to the ConnectError the app/UI sees — the
+ * single place where "what happened" becomes "what the user reads".
+ *
+ * - user-rejected → code -4 with the WALLET'S OWN message preserved
+ *   ("Transaction cancelled by the user" beats a generic "user rejected"
+ *   — it's what the wallet actually told the user).
+ * - request-expired → a plain-language explanation that the 5-minute WC
+ *   window lapsed, not a scary internal error.
+ * - anything else → internal error carrying the raw message.
+ */
+function wcErrorToConnectError(err, walletId) {
+    const { kind, message } = classifyWalletConnectError(err);
+    if (kind === 'user-rejected') {
+        return new ConnectError({
+            message: message || 'The user rejected this request in the wallet.',
+            code: -4,
+            walletId,
+        });
+    }
+    if (kind === 'request-expired') {
+        return new ConnectError({
+            message: 'Request expired — the wallet did not respond within WalletConnect\u2019s ' +
+                '5-minute window. Open the wallet, then try again.',
+            code: -1,
+            walletId,
+        });
+    }
+    return ConnectError.internal(message || 'Unknown WalletConnect error', undefined, walletId);
+}
 function isFatalRelayError(error) {
     if (typeof error === 'string') {
         if (FATAL_ERROR_PATTERNS.some((p) => p.test(error)))
@@ -192,15 +277,23 @@ export function createWalletConnectConnector(opts) {
      */
     let onUriHandler = opts.onUri ?? (() => { });
     /**
-     * Aborts an in-flight connect() attempt. Set when the user cancels, when
-     * or when a fatal relay error is detected.
-     * connect() checks this after every await and bails out if set.
+     * Aborts an in-flight connect() attempt. Set when the user cancels
+     * (abort() — the modal's back arrow) or when a fatal relay error is
+     * detected. connect() checks this after every await and bails out.
      */
     let connectAborted = false;
-    // No connect timeout — the user can take as long as they need to scan
-    // the QR and approve in their wallet. We only abort on fatal relay errors.
-    /** When a fatal relay error fires, we store the message here so connect()
-     *  can include it in the thrown ConnectError. */
+    /**
+     * Why an in-flight connect() was aborted — 'user' (the app called
+     * abort(), e.g. the modal's back arrow) vs 'fatal' (a fatal relay error
+     * like an invalid projectId). connect() maps each to a DIFFERENT error:
+     * a user cancel is a clean code -4 rejection, a fatal relay error stays
+     * an invalidRequest with the relay's message.
+     */
+    let abortReason = null;
+    /**
+     * When a fatal relay error fires, we store the message here so connect()
+     * can include it in the thrown ConnectError.
+     */
     let fatalErrorMessage = null;
     /**
      * True while a connect()'s pairing is waiting for the wallet to approve.
@@ -210,7 +303,56 @@ export function createWalletConnectConnector(opts) {
      * exists.
      */
     let connectInFlight = false;
-    /** Timeout for waiting for the wallet to approve the pairing — 60s. */
+    /**
+     * The pairing topic of the CURRENT connect() attempt, parsed from the
+     * `wc:<topic>@2?…` URI. Tracked so a failed/abandoned attempt can
+     * disconnect the pairing — see cleanupAbandonedPairing().
+     */
+    let activePairingTopic = null;
+    /**
+     * Disconnects the current connect attempt's pairing, best-effort.
+     *
+     * WHY THIS MATTERS — the ghost-pairing cascade. Before this cleanup, an
+     * abandoned connect() left its pairing alive: the modal's back arrow
+     * just reset the UI and "kept the promise running". The user then
+     * retried, a NEW pairing+proposal went out, and when the wallet finally
+     * answered the OLD proposal, its messages arrived for a topic/record
+     * this side had already discarded. The SDK logged the whole cascade at
+     * ERROR level —
+     *   "No matching key. proposal: <id>"          (crypto keychain miss)
+     *   "onRelayMessage() -> failed to process…"   (the decrypt failure)
+     *   "Pending session not found for topic …"    (the orphaned settle)
+     * — while the NEW proposal never got answered and eventually died with
+     * "Request expired. Please try again."
+     *
+     * `signClient.disconnect({ topic: <pairing> })` deletes the pairing on
+     * BOTH sides (it sends wc_pairingDelete to the wallet, which also
+     * dismisses the wallet's still-pending approval prompt) and
+     * unsubscribes the topic, so late approvals die at the relay instead of
+     * crashing against a missing key here.
+     *
+     * Fire-and-forget by design: never awaited by callers (a dead relay
+     * must not stall the error path), never throws.
+     */
+    function cleanupAbandonedPairing() {
+        const topic = activePairingTopic;
+        activePairingTopic = null;
+        if (!topic || !client)
+            return;
+        try {
+            void client
+                .disconnect({ topic, reason: { code: 6000, message: 'User disconnected' } })
+                .catch(() => undefined);
+        }
+        catch {
+            // Best-effort — a cleanup must never mask the real error.
+        }
+    }
+    /** Parses the pairing topic out of a `wc:<topic>@2?…` pairing URI. */
+    function pairingTopicFromUri(uri) {
+        const m = /^wc:([0-9a-f]+)@/i.exec(uri);
+        return m?.[1] ?? null;
+    }
     /**
      * Tears down the WC client's WebSocket relay and clears the singleton.
      * Called on disconnect, on fatal error, and on connect timeout — without
@@ -391,8 +533,14 @@ export function createWalletConnectConnector(opts) {
                 projectId: opts.projectId,
                 metadata: resolveMetadata(),
                 relayUrl: 'wss://relay.walletconnect.com',
+                ...(opts.logger ? { logger: opts.logger } : {}),
             });
-            // Listen for session deletion (wallet disconnected from their side)
+            // Listen for session deletion (wallet disconnected from their side).
+            // Clears EVERYTHING the connector knows about the session — including
+            // the persisted record, so a cold restart doesn't try to rehydrate a
+            // session the wallet already killed. Without the storage removal the
+            // record lingered until the next rehydration attempt noticed the SDK
+            // store no longer had the topic.
             client.on('session_delete', (...args) => {
                 const event = args[0];
                 if (event?.topic === sessionTopic) {
@@ -401,6 +549,9 @@ export function createWalletConnectConnector(opts) {
                     cachedNetwork = null;
                     peerMetadata = null;
                     grantedMethods = new Set();
+                    if (opts.storage) {
+                        void Promise.resolve(opts.storage.removeItem(WC_STORAGE_KEY)).catch(() => undefined);
+                    }
                 }
             });
             // CRITICAL: Listen for relay transport errors that are FATAL — e.g.
@@ -430,6 +581,7 @@ export function createWalletConnectConnector(opts) {
                     fatalErrorMessage = msg;
                     // Mark the connect attempt as aborted so connect() bails out
                     connectAborted = true;
+                    abortReason = 'fatal';
                     // Remove our event listeners before teardown — prevents re-entry
                     // while the async transportClose() is in flight.
                     try {
@@ -620,12 +772,24 @@ export function createWalletConnectConnector(opts) {
                 return await withNormalizedError(meta.id, async () => {
                     // Reset abort flag at the start of each connect attempt
                     connectAborted = false;
+                    abortReason = null;
                     fatalErrorMessage = null;
-                    const wc = await ensureClient();
-                    if (connectAborted) {
-                        throw ConnectError.invalidRequest(fatalErrorMessage
+                    // Helper: builds the ConnectError for the CURRENT abort state —
+                    // a user cancel is a clean code -4 rejection (the modal suppresses
+                    // the follow-up error event), a fatal relay error keeps the
+                    // invalidRequest shape with the relay's own message.
+                    const makeAbortError = () => abortReason === 'user'
+                        ? new ConnectError({
+                            message: 'Connection cancelled by the user.',
+                            code: -4,
+                            walletId: meta.id,
+                        })
+                        : ConnectError.invalidRequest(fatalErrorMessage
                             ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
                             : 'WalletConnect connection aborted — relay error (check your projectId).', undefined, meta.id);
+                    const wc = await ensureClient();
+                    if (connectAborted) {
+                        throw makeAbortError();
                     }
                     // Create the abort promise EARLY — before wc.connect() — because
                     // wc.connect() can hang if the relay is unreachable (e.g. invalid
@@ -648,10 +812,8 @@ export function createWalletConnectConnector(opts) {
                         };
                         checkAbort();
                     });
-                    // Helper: creates a ConnectError from the current fatalErrorMessage
-                    const makeAbortError = () => ConnectError.invalidRequest(fatalErrorMessage
-                        ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
-                        : 'WalletConnect connection aborted — relay error (check your projectId).', undefined, meta.id);
+                    // Helper: creates a ConnectError from the current abort state
+                    // (see makeAbortError above — reason-aware).
                     // Propose a session with the Stellar namespace.
                     // Race against abortPromise — if the relay fires a fatal error
                     // during wc.connect() (e.g. "Project not found"), the abort promise
@@ -700,6 +862,13 @@ export function createWalletConnectConnector(opts) {
                         });
                         uri = result.uri;
                         approval = result.approval;
+                        // Track this attempt's pairing so ANY failure below can disconnect
+                        // it (see cleanupAbandonedPairing) — leaving it alive is what
+                        // produces the SDK's "No matching key. proposal: …" cascade when
+                        // the wallet eventually answers an abandoned proposal.
+                        activePairingTopic =
+                            result.pairingTopic ??
+                                (uri ? pairingTopicFromUri(uri) : null);
                     }
                     catch (err) {
                         // The connect() call itself can fail with a fatal relay error
@@ -720,32 +889,33 @@ export function createWalletConnectConnector(opts) {
                     // Uses the late-bound handler (may have been overwritten by the modal).
                     if (uri && onUriHandler)
                         onUriHandler(uri);
-                    // Wait for the wallet to approve — NO TIMEOUT.
+                    // Wait for the wallet to approve — NO TIMEOUT of our own.
                     // The user may take as long as they need to scan the QR code and
-                    // approve in their wallet. We only abort if:
+                    // approve in their wallet. The SDK's own delayed promise still
+                    // rejects after the 5-minute proposal TTL ("Request expired…"),
+                    // and we abort early if:
                     //   1. A fatal relay error fires (e.g. invalid projectId → "Project
                     //      not found", relay unreachable, etc.)
-                    //   2. The user cancels (connectAborted is set by the caller)
+                    //   2. The user cancels (abort() sets connectAborted)
                     // The abort promise rejects immediately when connectAborted becomes
                     // true (checked every 200ms by the polling loop).
+                    //
+                    // Rejections are CLASSIFIED (wcErrorToConnectError): a wallet-side
+                    // rejection ("User rejected the proposal") becomes a code -4 with
+                    // the wallet's own message, and the SDK's expiry becomes a plain
+                    // "Request expired" explanation instead of raw SDK-speak.
                     const session = await Promise.race([
                         approval(),
                         abortPromise,
                     ]).catch((err) => {
                         // If the abort promise rejected, convert to ConnectError
                         if (err instanceof Error && err.message === '__WC_ABORTED__') {
-                            const reason = fatalErrorMessage
-                                ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
-                                : 'WalletConnect connection aborted — relay error (check your projectId).';
-                            throw ConnectError.invalidRequest(reason, undefined, meta.id);
+                            throw makeAbortError();
                         }
-                        throw err;
+                        throw wcErrorToConnectError(err, meta.id);
                     });
                     if (connectAborted) {
-                        const reason = fatalErrorMessage
-                            ? `WalletConnect relay error: ${fatalErrorMessage}. Check your projectId at cloud.walletconnect.com.`
-                            : 'WalletConnect connection aborted — relay error (check your projectId).';
-                        throw ConnectError.invalidRequest(reason, undefined, meta.id);
+                        throw makeAbortError();
                     }
                     sessionTopic = session.topic;
                     // Capture the peer wallet's metadata — the REAL wallet name and icon
@@ -842,13 +1012,49 @@ export function createWalletConnectConnector(opts) {
                             peerMetadata,
                         }));
                     }
+                    // The pairing carries the settled session now — it must NOT be
+                    // disconnected by a later cleanup; only failed attempts abandon it.
+                    activePairingTopic = null;
                     return { address: cachedAddress, walletId: meta.id };
                 });
+            }
+            catch (err) {
+                // The attempt failed — abandon its pairing so a late wallet
+                // approval lands on a disconnected topic instead of producing the
+                // SDK's "No matching key. proposal: …" cascade (see
+                // cleanupAbandonedPairing). (User-initiated aborts already
+                // disconnected it in abort(); the second call is a no-op.)
+                cleanupAbandonedPairing();
+                throw err;
             }
             finally {
                 stopAbortPoll = true;
                 connectInFlight = false;
             }
+        },
+        /**
+         * Cancels an in-flight connect() — the user backed out of the
+         * connecting view (modal back arrow / sheet close) or the app wants to
+         * give up on the pairing.
+         *
+         * What this does that a plain UI reset doesn't:
+         * 1. connect() rejects promptly with a code -4 "cancelled" ConnectError
+         *    (within one 200ms abort-poll tick) — instead of the promise
+         *    floating for the SDK's full 5-minute proposal TTL and THEN throwing
+         *    "Request expired" at an unsuspecting screen.
+         * 2. The attempt's pairing is disconnected immediately — the wallet's
+         *    still-pending approval prompt is dismissed via wc_pairingDelete and
+         *    its eventual answer dies at the relay, instead of arriving here as
+         *    the SDK's "No matching key. proposal: …" ERROR-log cascade.
+         *
+         * No-op when nothing is in flight.
+         */
+        abort() {
+            if (!connectInFlight)
+                return;
+            connectAborted = true;
+            abortReason = 'user';
+            cleanupAbandonedPairing();
         },
         async disconnect() {
             if (client && sessionTopic) {
@@ -906,25 +1112,32 @@ export function createWalletConnectConnector(opts) {
                     throw ConnectError.invalidRequest('WalletConnect wallet does not support stellar_signXDR ' +
                         `(approved methods: ${[...grantedMethods].join(', ') || 'none'}).`, undefined, meta.id);
                 }
-                const result = await client.request({
-                    topic: sessionTopic,
-                    chainId: resolveWcChainId(),
-                    request: {
-                        method: 'stellar_signXDR',
-                        params: {
-                            xdr,
-                            publicKey: signOpts?.address ?? cachedAddress ?? undefined,
-                            network: signOpts?.networkPassphrase ?? opts.networkPassphrase,
+                let result;
+                try {
+                    result = await client.request({
+                        topic: sessionTopic,
+                        chainId: resolveWcChainId(),
+                        request: {
+                            method: 'stellar_signXDR',
+                            params: {
+                                xdr,
+                                publicKey: signOpts?.address ?? cachedAddress ?? undefined,
+                                network: signOpts?.networkPassphrase ?? opts.networkPassphrase,
+                            },
                         },
-                    },
-                });
-                // WC errors can be objects { code, message } or strings
+                    });
+                }
+                catch (err) {
+                    // The SDK's delayed promise rejects here on wallet rejections
+                    // (Lobstr: { message: "Transaction cancelled by the user" }) and
+                    // on the 5-minute TTL lapse ("Request expired. Please try
+                    // again.") — classify instead of leaking raw SDK-speak.
+                    throw wcErrorToConnectError(err, meta.id);
+                }
+                // Some wallets return the error IN-BAND (a resolved { error })
+                // instead of rejecting — classify those exactly the same way.
                 if (result && typeof result === 'object' && 'error' in result) {
-                    const err = result.error;
-                    const errMsg = typeof err === 'string'
-                        ? err
-                        : err?.message ?? JSON.stringify(err);
-                    throw ConnectError.internal(`WalletConnect sign error: ${errMsg}`, undefined, meta.id);
+                    throw wcErrorToConnectError(result.error, meta.id);
                 }
                 const signedXDR = result.signedXDR;
                 if (!signedXDR) {
@@ -954,24 +1167,27 @@ export function createWalletConnectConnector(opts) {
                 //
                 // Request params: { entryXdr } — base64-encoded HashIdPreimage XDR
                 // Response: { signedAuthEntry, signerAddress }
-                const result = await client.request({
-                    topic: sessionTopic,
-                    chainId: resolveWcChainId(),
-                    request: {
-                        method: 'stellar_signAuthEntry',
-                        params: {
-                            entryXdr: authEntryXdr,
-                            publicKey: signOpts?.address ?? cachedAddress ?? undefined,
+                let result;
+                try {
+                    result = await client.request({
+                        topic: sessionTopic,
+                        chainId: resolveWcChainId(),
+                        request: {
+                            method: 'stellar_signAuthEntry',
+                            params: {
+                                entryXdr: authEntryXdr,
+                                publicKey: signOpts?.address ?? cachedAddress ?? undefined,
+                            },
                         },
-                    },
-                });
-                // WC errors can be objects { code, message } or strings
+                    });
+                }
+                catch (err) {
+                    // Classified like signTransaction — see the notes there.
+                    throw wcErrorToConnectError(err, meta.id);
+                }
+                // In-band { error } responses — classified the same way.
                 if (result && typeof result === 'object' && 'error' in result) {
-                    const err = result.error;
-                    const errMsg = typeof err === 'string'
-                        ? err
-                        : err?.message ?? JSON.stringify(err);
-                    throw ConnectError.internal(`WalletConnect signAuthEntry error: ${errMsg}`, undefined, meta.id);
+                    throw wcErrorToConnectError(result.error, meta.id);
                 }
                 const signedAuthEntry = result.signedAuthEntry;
                 if (!signedAuthEntry) {
@@ -1015,15 +1231,10 @@ export function createWalletConnectConnector(opts) {
                             },
                         },
                     });
-                    // WC errors can be objects { code, message } or strings — handle both
+                    // WC errors can be objects { code, message } or strings —
+                    // classified exactly like a thrown rejection.
                     if (result && typeof result === 'object' && 'error' in result) {
-                        const err = result.error;
-                        const errMsg = typeof err === 'string'
-                            ? err
-                            : err?.message
-                                ? err.message
-                                : JSON.stringify(err);
-                        throw new Error(errMsg);
+                        throw wcErrorToConnectError(result.error, meta.id);
                     }
                     // Check all known response field names
                     const signature = result.signature ??
@@ -1044,25 +1255,19 @@ export function createWalletConnectConnector(opts) {
                     };
                 }
                 catch (err) {
-                    // Parse the error properly — WC SDK throws objects, not just Errors
-                    let errMsg;
-                    if (err instanceof Error) {
-                        errMsg = err.message;
+                    // Classify FIRST — a wallet rejection ("Transaction cancelled by
+                    // the user") becomes a code -4 with the wallet's own words, the
+                    // SDK's 5-minute TTL lapse becomes the plain "Request expired"
+                    // explanation. Method-support failures fall through to the
+                    // targeted invalidRequest below.
+                    const classified = classifyWalletConnectError(err);
+                    if (classified.kind !== 'other') {
+                        throw wcErrorToConnectError(err, meta.id);
                     }
-                    else if (typeof err === 'string') {
-                        errMsg = err;
-                    }
-                    else if (err && typeof err === 'object') {
-                        const e = err;
-                        errMsg = e.message ?? e.reason ?? `WC error (code: ${e.code ?? 'unknown'})`;
-                    }
-                    else {
-                        errMsg = String(err);
-                    }
+                    const errMsg = classified.message;
                     // Distinguish between "method not supported" (WC protocol error)
-                    // and "wallet rejected the request" (user declined, domain
-                    // mismatch, etc). Don't say "does not support" if the wallet
-                    // actually processed the request but rejected it.
+                    // and any other failure. Don't say "does not support" if the
+                    // wallet actually processed the request but rejected it.
                     const isMethodNotSupported = errMsg.toLowerCase().includes('method not found') ||
                         errMsg.toLowerCase().includes('not supported') ||
                         errMsg.toLowerCase().includes('not approved') === false &&
@@ -1071,9 +1276,9 @@ export function createWalletConnectConnector(opts) {
                         throw ConnectError.invalidRequest(`WalletConnect wallet does not support stellar_signMessage (this method is optional — the wallet may not implement it). Error: ${errMsg}`, undefined, meta.id);
                     }
                     else {
-                        // The wallet DOES support stellar_signMessage but rejected the
-                        // request (user declined, untrusted domain, network mismatch, etc.)
-                        throw ConnectError.internal(`WalletConnect signMessage rejected: ${errMsg}`, undefined, meta.id);
+                        // The wallet DOES support stellar_signMessage but the request
+                        // failed for another reason (relay, serialization, …).
+                        throw ConnectError.internal(`WalletConnect signMessage failed: ${errMsg}`, undefined, meta.id);
                     }
                 }
             });

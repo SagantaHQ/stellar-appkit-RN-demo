@@ -47,6 +47,12 @@ export interface ReactNativeConnectorsOptions {
         icons: string[];
     };
     /**
+     * WalletConnect SDK logger level — `'silent'` hides the SDK's internal
+     * console chatter (the ERROR-level "No matching key. proposal: …" lines a
+     * stale relay delivery prints). See the core connector's `logger` option.
+     */
+    logger?: 'silent' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+    /**
      * Albedo WebView bridge. When omitted, the Albedo (WebView) connector is
      * NOT registered — you'd need `react-native-webview` installed anyway.
      * The `@saganta/stellar-appkit-react-native/albedo` entry exports a ready

@@ -1,5 +1,32 @@
 import type { WalletConnector, ConnectStorage } from '../types.js';
 /**
+ * Classifies a WalletConnect failure into the three kinds app/UI code can
+ * actually react to.
+ *
+ * WHY THIS EXISTS: the WC SDK surfaces every wallet-side outcome as a raw
+ * thrown object — Lobstr rejects a sign request with
+ * `{ message: "Transaction cancelled by the user" }`, the SDK's own
+ * delayed-promise rejects after the 5-minute TTL with
+ * `Error("Request expired. Please try again.")`, and namespace-validation
+ * failures throw "Missing or invalid. request() method: …". Before this
+ * classifier all of those collapsed into either a generic
+ * "The user rejected this request." (discarding the wallet's own words) or
+ * an opaque internal error — while the raw messages only showed up as
+ * ERROR-level SDK console noise, which made the library look like it was
+ * ignoring WalletConnect entirely.
+ */
+export type WalletConnectErrorKind = 'user-rejected' | 'request-expired' | 'other';
+/** Robustly extracts a human message from the shapes the WC SDK throws. */
+export declare function walletConnectErrorMessage(err: unknown): string;
+/**
+ * Classifies a WalletConnect error/rejection. Pure — safe to unit-test and
+ * to call from any path (never throws, never touches SDK state).
+ */
+export declare function classifyWalletConnectError(err: unknown): {
+    kind: WalletConnectErrorKind;
+    message: string;
+};
+/**
  * The connected wallet's own identity, as reported by the wallet in the
  * WalletConnect session's `peer` metadata. Lets the UI show "Freighter" /
  * "LOBSTR" / "HOT Wallet" instead of the generic "WalletConnect" label.
@@ -77,6 +104,23 @@ export interface WalletConnectConnectorOptions {
      * passphrase) or when you want to override the default.
      */
     networkPassphrase?: string;
+    /**
+     * WalletConnect SDK logger level — passed straight to
+     * `SignClient.init({ logger })`.
+     *
+     * The WC SDK logs its internal chatter (stale relay deliveries, pairing
+     * cleanups, request expiries) at ERROR level through pino, so on React
+     * Native terminals those lines show up as
+     * `{"level": 50, "msg": "No matching key. proposal: …"}` even when
+     * nothing is wrong from the app's perspective. Set `'silent'` to hide
+     * ALL SDK console output (including genuine relay errors — everything
+     * that matters to the flow is still surfaced as typed ConnectErrors),
+     * `'error'` to keep the default, `'warn'`/`'info'`/`'debug'`/`'trace'`
+     * for progressively noisier diagnostics.
+     *
+     * Optional — when omitted, the SDK default applies.
+     */
+    logger?: 'silent' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 }
 export declare function createWalletConnectConnector(opts: WalletConnectConnectorOptions): WalletConnector;
 //# sourceMappingURL=walletconnect.d.ts.map

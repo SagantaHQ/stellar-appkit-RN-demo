@@ -40,6 +40,7 @@ export function defaultReactNativeConnectors(opts) {
             onUri: opts.onUri,
             storage: opts.storage,
             metadata: opts.metadata,
+            logger: opts.logger,
         }),
     ];
     if (opts.albedoBridge) {

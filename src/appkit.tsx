@@ -242,6 +242,12 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
     const connectors = WC_PROJECT_ID
       ? defaultReactNativeConnectors({
           projectId: WC_PROJECT_ID,
+          // 'silent' hides the WC SDK's internal pino chatter — the
+          // ERROR-level "No matching key. proposal: …" / "Request expired"
+          // lines a stale relay delivery prints. Real failures still reach
+          // the app as typed ConnectErrors (wallet cancellations keep the
+          // wallet's own message, e.g. "Transaction cancelled by the user").
+          logger: 'silent',
           albedoBridge,
           albedoOrigin: APP_URL,
           xbullBridge,
