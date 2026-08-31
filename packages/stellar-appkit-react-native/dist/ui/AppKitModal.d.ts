@@ -60,6 +60,16 @@
  *   manual pairing fields.
  * - **True wallet names** — connecting/signing/SIWS views carry the
  *   wallet's own name and icon, never a generic "WalletConnect" label.
+ * - **Auto-close on success** — when the operation the app requested
+ *   completes successfully (a connect settles — including the return from
+ *   the wallet app's approval screen — or the sign queue drains cleanly),
+ *   the sheet dismisses itself after a short confirmation flash. The
+ *   mobile deep-link pattern: the user just confirmed in the wallet, the
+ *   round trip is done. The web modal instead stays open on the account
+ *   view; RN deviates on purpose (documented in ARCHITECTURE.md). Success
+ *   is the ONLY trigger — never fires on errors/rejections (web parity:
+ *   the user reads the result and acts on it); opt out with
+ *   `autoCloseOnComplete={false}`. See ui/auto-close.ts.
  *
  * Presentation: @gorhom/bottom-sheet with a backdrop + swipe-to-dismiss
  * (default), or the inline panel. Icons render through `<WalletIcon>` —
@@ -105,6 +115,18 @@ export interface AppKitModalProps {
      * passkey-needing web wallets must use this surface instead of a WebView.
      */
     browser?: ThemedBrowserSession;
+    /**
+     * Bottom-sheet mode only (default true): when an operation the app
+     * requested completes SUCCESSFULLY — a connect settles (deep-link
+     * handoff included, SIWS run to its end) or the sign queue drains
+     * cleanly — the sheet closes itself after a short confirmation flash
+     * instead of parking on the account view until the user dismisses it.
+     * Success is the only trigger: failures and rejections never auto-close
+     * (web parity: the user reads the result and acts on it), inline panels
+     * are exempt (no sheet to close), and reopening the modal for account
+     * management never self-closes. See ui/auto-close.ts.
+     */
+    autoCloseOnComplete?: boolean;
 }
-export declare function AppKitModal({ client, open, onClose, theme, mode, title, logo, browser, }: AppKitModalProps): React.JSX.Element | null;
+export declare function AppKitModal({ client, open, onClose, theme, mode, title, logo, browser, autoCloseOnComplete, }: AppKitModalProps): React.JSX.Element | null;
 //# sourceMappingURL=AppKitModal.d.ts.map

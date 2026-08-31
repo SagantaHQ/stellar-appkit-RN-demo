@@ -122,6 +122,17 @@ which requires a project id:
   with no redirect configured nothing self-opens. In Expo Go the custom scheme isn't OS-registered
   (both paths no-op, swiping back still settles instantly via the zombie-socket fix) — the
   bounce-back is live in a dev-client / EAS build.
+- **Auto-close on success** — the sheet closes itself the moment the round trip actually
+  succeeded: a connect settling (deep-link return included, SIWS run to its end) or the sign
+  queue draining cleanly gets a ~0.9s "connected ✓" flash on the account view, then the sheet
+  slides away — no extra dismissal tap. Success is the only trigger: rejected connects/signs,
+  expired WalletConnect requests and network mismatches keep the error variant open (the user
+  reads the outcome and picks Cancel / Try again), and every user action (back arrow, switch
+  wallet, declining the preview, tapping into the account panel) disarms the pending close.
+  Reopening the sheet for account management never self-closes, inline panels are exempt, and
+  `autoCloseOnComplete={false}` restores the web modal's stay-on-account behavior. Together
+  with the focus-return bullet above it's one round trip: the wallet backgrounds itself, the
+  sheet gets out of the way, your app's UI is what's waiting.
 - **Themed in-app browser** — a new "In-app browser" card + every web link in the
   modal (explorer, wallet install pages, the footer) opens in a themed Chrome Custom
   Tab / SFSafariViewController — modal `pageSheet` on iOS, themed toolbars on Android —
