@@ -109,10 +109,15 @@ export interface SubmitResult {
  * directly so the heavy SDK server class never enters the bundle.
  */
 export async function submitSignedTx(signedTxXdr: string): Promise<SubmitResult> {
+  // Horizon's POST /transactions accepts ONLY `application/x-www-form-urlencoded`
+  // with the envelope as the `tx` field — a JSON body is answered with
+  // 415 "Unsupported Media Type" (which is how every Send XLM died before:
+  // "Transaction rejected by network (tx: Unsupported Media Type)"). The
+  // base64 envelope must be URL-encoded — it can contain `+`, `/` and `=`.
   const res = await fetch(`${HORIZON_URL}/transactions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tx: signedTxXdr }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `tx=${encodeURIComponent(signedTxXdr)}`,
   });
   const data = (await res.json().catch(() => ({}))) as {
     hash?: string;

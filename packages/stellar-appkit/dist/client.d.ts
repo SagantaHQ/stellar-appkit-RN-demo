@@ -228,6 +228,13 @@ export declare class StellarAppKit {
     private tabSync;
     private signChain;
     private _pendingSignCount;
+    /**
+     * The last FAILED wallet-side sign that "Try again" can re-drive — armed
+     * by runRetryableSign() only when the wallet call itself rejects (never
+     * for preview rejections), cleared on success / new sign / disconnect.
+     * See retryLastSign().
+     */
+    private retryableSign;
     constructor(config: StellarAppKitConfig);
     /** Modal UI config from StellarAppKitConfig.modal — read by ui-web when attached. */
     readonly modalConfig?: StellarAppKitModalConfig;
@@ -337,6 +344,31 @@ export declare class StellarAppKit {
      * a time, in call order, instead of unpredictably.
      */
     private enqueueSign;
+    /**
+     * Runs the wallet-side half of a sign request. On failure, records the
+     * rerun for retryLastSign(). The app-facing promise still rejects
+     * normally — the retry result is delivered via the 'signRetried' event
+     * because the original promise cannot be settled twice.
+     *
+     * Preview rejections never reach this wrapper (they throw before the
+     * wallet call), so a preview the user declined can never be bypassed by
+     * a retry.
+     */
+    private runRetryableSign;
+    /** Re-enqueues a recorded wallet-side sign and emits 'signRetried' on success. Fire-and-forget — the result reaches apps via the event, not a promise. */
+    private redriveSign;
+    /**
+     * Re-drives the last FAILED wallet-side sign (the "Try again" button on the
+     * modals' signing-error view). The wallet is asked again through the normal
+     * sign queue — every signQueueChange / error event fires, the modal flows
+     * back through the signing view exactly as it did the first time, and a
+     * successful retry emits 'signRetried' with the result.
+     *
+     * Returns false when there's nothing to retry (the last sign succeeded, a
+     * newer sign superseded it, or the session was torn down) — callers treat
+     * that as "fall back to the previous view".
+     */
+    retryLastSign(): boolean;
     /**
      * Signs a transaction. Queued alongside every other sign* call (see
      * enqueueSign) so concurrent requests resolve in order instead of
