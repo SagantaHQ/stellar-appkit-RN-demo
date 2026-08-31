@@ -321,6 +321,27 @@ export declare class StellarAppKit {
     disconnect(walletId?: string): Promise<void>;
     /** Disconnects every connected wallet. */
     disconnectAll(): Promise<void>;
+    /**
+     * Reconciles the client after a WALLET-initiated disconnect — invoked by
+     * connectors through the setOnSessionInvalidated wiring (WalletConnect's
+     * session_delete / session_expire) when the user kills the session from
+     * inside the wallet, as opposed to disconnect(), which is the app asking
+     * the wallet to leave.
+     *
+     * The connector has already cleared its own state (and its persisted
+     * record) by the time this runs, so — unlike disconnect() — we don't call
+     * connector.disconnect() (nothing left to disconnect, and the wallet
+     * already knows). Everything else mirrors disconnect(): the session is
+     * dropped from the map AND from persisted storage, a pending "Try again"
+     * for this wallet dies with it, the most recently connected remaining
+     * wallet becomes active, and `disconnect` + `sessionsChanged` fire so
+     * modals/hooks/app code see the wallet leave in real time.
+     *
+     * Synchronous-first by design: the session is removed from the map before
+     * any await so a burst of session_delete + session_expire for the same
+     * topic (the relay can deliver both) reconciles exactly once.
+     */
+    private handleExternalDisconnect;
     /** Releases resources held by the client (currently just the cross-tab sync channel) — call on unmount in long-lived SPAs if you're creating fresh clients repeatedly. */
     dispose(): void;
     /** Re-reads storage after another tab reported a change, and reconciles in-memory state against it. Never writes back to storage itself, to avoid a notify loop between tabs. */

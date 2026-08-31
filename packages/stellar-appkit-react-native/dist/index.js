@@ -25,7 +25,7 @@
 export * from '@saganta/stellar-appkit';
 export { defaultReactNativeConnectors, createAlbedoWebViewConnector, createXBullWebViewConnector, XBULL_WALLET_URL, ALBEDO_FRONTEND_URL, } from './connectors/index.js';
 export { createAsyncStorage, createMemoryStorage, } from './storage.js';
-export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, } from './deep-links.js';
+export { registerMobileWallet, listMobileWallets, getMobileWallet, buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, findWalletByDeepLink, formatWalletConnectLink, formatWalletConnectUniversalLink, resolveSignHandoffWalletId, buildSignHandoffLink, } from './deep-links.js';
 export { isReactNativeRuntime } from './platform.js';
 export { attachWalletConnectForegroundRefresh, } from './wc-foreground.js';
 export { attachAppFocusReturn, resolveAppFocusTarget, shouldAttemptAppFocus, FOCUS_ATTEMPT_COOLDOWN_MS, } from './focus-return.js';

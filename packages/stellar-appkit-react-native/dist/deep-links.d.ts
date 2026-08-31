@@ -177,4 +177,31 @@ export declare function buildOpenWalletAppLink(walletId: string): string;
  * useful when handling an incoming `app://wc?uri=...` redirect.
  */
 export declare function findWalletByDeepLink(deepLink: string): MobileWalletDeepLink | undefined;
+/**
+ * The deep-link shape the settled WalletConnect session's PEER metadata
+ * reports for the wallet that answered — the connector's getSessionPeer()
+ * `redirect` field. Structural on purpose: the core type flows in as a
+ * plain object and this module shouldn't import from core.
+ */
+export interface WalletPeerRedirect {
+    native: string | null;
+    universal: string | null;
+}
+/**
+ * Resolves which registered mobile wallet a sign request should hand off
+ * to — the wallet the user picked during connect, or — after a cold
+ * restart, when that pick was never made in this process — the wallet the
+ * restored session's peer metadata points back to (its `redirect.native`
+ * scheme is the wallet's own re-open link). Returns null when no target is
+ * derivable (desktop wallet, unregistered scheme, no session).
+ */
+export declare function resolveSignHandoffWalletId(peer: WalletPeerRedirect | null | undefined, pickedWalletId: string | null): string | null;
+/**
+ * Builds the "open this wallet for the pending sign request" link for the
+ * handoff target: the registered wallet's bare scheme when the id maps into
+ * the registry, otherwise the peer's own native deep link verbatim (an
+ * unregistered wallet's redirect still opens that wallet). Returns null when
+ * neither is available — the caller keeps its manual affordances.
+ */
+export declare function buildSignHandoffLink(walletId: string | null, peer: WalletPeerRedirect | null | undefined): string | null;
 //# sourceMappingURL=deep-links.d.ts.map

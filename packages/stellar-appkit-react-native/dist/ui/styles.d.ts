@@ -335,6 +335,7 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         paddingHorizontal: number;
         alignItems: "center";
         marginTop: number;
+        marginBottom: number;
         alignSelf: "stretch";
     };
     primaryButtonPressed: {
@@ -385,6 +386,10 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         color: string;
         fontSize: number;
         fontWeight: "600";
+    };
+    account: {
+        gap: number;
+        paddingTop: number;
     };
     accountHeader: {
         flexDirection: "row";
@@ -456,7 +461,6 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         backgroundColor: string;
         borderWidth: number;
         borderColor: string;
-        marginBottom: number;
     };
     overflowItem: {
         flexDirection: "row";
@@ -488,7 +492,6 @@ export declare function buildStyles(theme: ConnectThemeRN): {
         backgroundColor: string;
         borderWidth: number;
         borderColor: string;
-        marginBottom: number;
     };
     pendingBannerText: {
         color: string;

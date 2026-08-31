@@ -76,6 +76,21 @@
  *   the JS thread for seconds on debug builds, and firing it in the open
  *   tick would freeze the sheet's layout/entrance animation — the tap
  *   would look dead for 5-10 seconds. See ui/warm-up.ts.
+ * - **Auto-open the wallet on sign** (`autoOpenWalletOnSign`, default on)
+ *   — the moment a WalletConnect request is queued from this side (sign,
+ *   auth entry, SIWS prompt, retry), the paired wallet app opens by
+ *   itself, MWA-style: the user lands straight in the wallet's pending
+ *   prompt instead of tapping "Open in wallet app". Fires only on NEW
+ *   requests (count increases), only while the app is foregrounded, and
+ *   only when a target is derivable — the connect-time pick, or the
+ *   wallet the restored session's peer metadata points back to after a
+ *   cold restart. Failures are silent; the manual button remains.
+ * - **Wallet-side disconnects propagate** — when the user disconnects
+ *   INSIDE the wallet, session_delete arrives over the relay (typically
+ *   on the next foregrounding, when the transport restart re-delivers
+ *   queued messages), core reconciles its session map, and the modal
+ *   flips off the account view exactly as if the app had disconnected.
+ *   No zombie "connected" UI for a session the wallet already killed.
  *
  * Presentation: @gorhom/bottom-sheet with a backdrop + swipe-to-dismiss
  * (default), or the inline panel. Icons render through `<WalletIcon>` —
@@ -133,6 +148,20 @@ export interface AppKitModalProps {
      * management never self-closes. See ui/auto-close.ts.
      */
     autoCloseOnComplete?: boolean;
+    /**
+     * Default true: the moment a WalletConnect request is triggered from
+     * this side — a sign, an auth entry, a SIWS prompt — the paired wallet
+     * app is opened automatically (MWA-style: the user lands straight in the
+     * wallet's pending prompt instead of tapping "Open in wallet app" by
+     * hand). Only fires while the app is foregrounded and only when a target
+     * is derivable: the wallet the user picked during connect, or the wallet
+     * the restored session's peer metadata points back to after a cold
+     * restart. The short dispatch delay lets the request reach the relay
+     * before the app backgrounds; failures are silent (the manual button on
+     * the signing view remains as the fallback). Set false to keep the
+     * fully-manual handoff (the button only).
+     */
+    autoOpenWalletOnSign?: boolean;
 }
-export declare function AppKitModal({ client, open, onClose, theme, mode, title, logo, browser, autoCloseOnComplete, }: AppKitModalProps): React.JSX.Element | null;
+export declare function AppKitModal({ client, open, onClose, theme, mode, title, logo, browser, autoCloseOnComplete, autoOpenWalletOnSign, }: AppKitModalProps): React.JSX.Element | null;
 //# sourceMappingURL=AppKitModal.d.ts.map

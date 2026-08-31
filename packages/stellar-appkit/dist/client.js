@@ -150,6 +150,17 @@ export class StellarAppKit {
             if (typeof wc._setAppMetadata === 'function' && this.appMetadata) {
                 wc._setAppMetadata(this.appMetadata);
             }
+            // Wallet-initiated disconnect propagation: relay-based connectors
+            // (WalletConnect) can be killed from the WALLET side — the user taps
+            // Disconnect inside the wallet app, and session_delete arrives over
+            // the relay (delivered while we run; on React Native typically on the
+            // next foregrounding, where the modal restarts the transport). Without
+            // this wiring the connector cleared only its OWN state and the client
+            // kept serving a dead session: status 'connected', account view up,
+            // until the next sign request blew up. See handleExternalDisconnect.
+            if (typeof wc.setOnSessionInvalidated === 'function') {
+                wc.setOnSessionInvalidated(() => this.handleExternalDisconnect(connector.id));
+            }
         }
         this.storage = config.storage ?? createWebStorage();
         this.customNetworkPassphrase = config.networkPassphrase;
@@ -509,6 +520,45 @@ export class StellarAppKit {
         this.setStatus('idle');
         walletIds.forEach((walletId) => this.emitter.emit('disconnect', { walletId }));
         this.emitter.emit('sessionsChanged', this.sessions);
+    }
+    /**
+     * Reconciles the client after a WALLET-initiated disconnect — invoked by
+     * connectors through the setOnSessionInvalidated wiring (WalletConnect's
+     * session_delete / session_expire) when the user kills the session from
+     * inside the wallet, as opposed to disconnect(), which is the app asking
+     * the wallet to leave.
+     *
+     * The connector has already cleared its own state (and its persisted
+     * record) by the time this runs, so — unlike disconnect() — we don't call
+     * connector.disconnect() (nothing left to disconnect, and the wallet
+     * already knows). Everything else mirrors disconnect(): the session is
+     * dropped from the map AND from persisted storage, a pending "Try again"
+     * for this wallet dies with it, the most recently connected remaining
+     * wallet becomes active, and `disconnect` + `sessionsChanged` fire so
+     * modals/hooks/app code see the wallet leave in real time.
+     *
+     * Synchronous-first by design: the session is removed from the map before
+     * any await so a burst of session_delete + session_expire for the same
+     * topic (the relay can deliver both) reconciles exactly once.
+     */
+    handleExternalDisconnect(walletId) {
+        if (!this._sessions.has(walletId))
+            return; // nothing to reconcile (or already done)
+        this._sessions.delete(walletId);
+        if (this._activeWalletId === walletId) {
+            const remaining = Array.from(this._sessions.values());
+            this._activeWalletId = remaining[remaining.length - 1]?.walletId ?? null;
+            // The wallet half of any pending "Try again" for the active wallet
+            // just died with the connection — the retry can't run without it.
+            this.retryableSign = null;
+        }
+        void (async () => {
+            await this.clearSiwsSession().catch(() => void 0);
+            await this.persist();
+            this.setStatus(this._sessions.size > 0 ? 'connected' : 'idle');
+            this.emitter.emit('disconnect', { walletId });
+            this.emitter.emit('sessionsChanged', this.sessions);
+        })().catch(() => undefined);
     }
     /** Releases resources held by the client (currently just the cross-tab sync channel) — call on unmount in long-lived SPAs if you're creating fresh clients repeatedly. */
     dispose() {

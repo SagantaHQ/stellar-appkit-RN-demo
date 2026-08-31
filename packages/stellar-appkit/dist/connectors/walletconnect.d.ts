@@ -38,6 +38,21 @@ export interface WalletConnectPeerMetadata {
     url: string | null;
     /** The wallet's icon (https URL), when provided. */
     icon: string | null;
+    /**
+     * The wallet's own declared deep links (WalletConnect `redirect`
+     * metadata) — `native` is a custom scheme that re-opens the WALLET app,
+     * `universal` its https fallback. Mobile UIs use these to hand off to
+     * the wallet for a pending sign request (and back) without knowing the
+     * wallet's scheme a priori — the session itself carries it.
+     *
+     * Null/absent when the wallet didn't declare redirects (desktop wallets,
+     * older wallets) or before a session settles. Persisted alongside the
+     * rest of the peer record so a cold-restarted app can still hand off.
+     */
+    redirect?: {
+        native: string | null;
+        universal: string | null;
+    } | null;
 }
 export interface WalletConnectConnectorOptions {
     /** WalletConnect Cloud project ID — get one at cloud.walletconnect.com. */

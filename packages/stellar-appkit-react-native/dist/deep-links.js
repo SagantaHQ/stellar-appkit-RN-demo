@@ -461,4 +461,35 @@ export function findWalletByDeepLink(deepLink) {
         return undefined;
     return listMobileWallets().find((w) => w.scheme.toLowerCase() === scheme);
 }
+/**
+ * Resolves which registered mobile wallet a sign request should hand off
+ * to — the wallet the user picked during connect, or — after a cold
+ * restart, when that pick was never made in this process — the wallet the
+ * restored session's peer metadata points back to (its `redirect.native`
+ * scheme is the wallet's own re-open link). Returns null when no target is
+ * derivable (desktop wallet, unregistered scheme, no session).
+ */
+export function resolveSignHandoffWalletId(peer, pickedWalletId) {
+    if (pickedWalletId && getMobileWallet(pickedWalletId))
+        return pickedWalletId;
+    const native = peer?.native;
+    if (native) {
+        const wallet = findWalletByDeepLink(native);
+        if (wallet)
+            return wallet.id;
+    }
+    return null;
+}
+/**
+ * Builds the "open this wallet for the pending sign request" link for the
+ * handoff target: the registered wallet's bare scheme when the id maps into
+ * the registry, otherwise the peer's own native deep link verbatim (an
+ * unregistered wallet's redirect still opens that wallet). Returns null when
+ * neither is available — the caller keeps its manual affordances.
+ */
+export function buildSignHandoffLink(walletId, peer) {
+    if (walletId && getMobileWallet(walletId))
+        return buildOpenWalletAppLink(walletId);
+    return peer?.native ?? null;
+}
 //# sourceMappingURL=deep-links.js.map
