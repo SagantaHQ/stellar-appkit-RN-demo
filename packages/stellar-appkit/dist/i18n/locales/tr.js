@@ -40,6 +40,7 @@ const tr = {
         "section_stellar": "Stellar cüzdanları",
         "more_wallets": "Daha fazla cüzdan ({count})",
         "status": {
+            "checking": "Kontrol ediliyor…",
             "connecting": "Bağlanıyor…",
             "locked": "Kilitli",
             "unavailable": "Kullanılamaz",

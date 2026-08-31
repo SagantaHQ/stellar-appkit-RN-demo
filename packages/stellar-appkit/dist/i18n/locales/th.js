@@ -40,6 +40,7 @@ const th = {
         "section_stellar": "วอลเล็ต Stellar",
         "more_wallets": "วอลเล็ตเพิ่มเติม ({count})",
         "status": {
+            "checking": "กำลังตรวจสอบ…",
             "connecting": "กำลังเชื่อมต่อ…",
             "locked": "ล็อค",
             "unavailable": "ไม่พร้อมใช้งาน",

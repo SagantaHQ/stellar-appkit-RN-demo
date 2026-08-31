@@ -40,6 +40,7 @@ const ja = {
         "section_stellar": "Stellarウォレット",
         "more_wallets": "その他のウォレット（{count}）",
         "status": {
+            "checking": "確認中…",
             "connecting": "接続中…",
             "locked": "ロック中",
             "unavailable": "利用不可",

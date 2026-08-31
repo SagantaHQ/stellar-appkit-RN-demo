@@ -40,6 +40,7 @@ const pt_BR = {
         "section_stellar": "Carteiras Stellar",
         "more_wallets": "Mais carteiras ({count})",
         "status": {
+            "checking": "Verificando…",
             "connecting": "Conectando…",
             "locked": "Bloqueada",
             "unavailable": "Indisponível",

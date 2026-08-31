@@ -53,6 +53,7 @@ export declare const en: {
         readonly section_stellar: 'Stellar wallets';
         readonly more_wallets: 'More wallets ({count})';
         readonly status: {
+            readonly checking: 'Checking…';
             readonly connecting: 'Connecting…';
             readonly locked: 'Locked';
             readonly unavailable: 'Unavailable';

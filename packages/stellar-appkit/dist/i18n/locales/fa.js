@@ -40,6 +40,7 @@ const fa = {
         "section_stellar": "کیف‌پول‌های استلار",
         "more_wallets": "کیف‌پول‌های بیشتر ({count})",
         "status": {
+            "checking": "در حال بررسی…",
             "connecting": "در حال اتصال…",
             "locked": "قفل شده",
             "unavailable": "غیرفعال",

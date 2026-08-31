@@ -40,6 +40,7 @@ const uk = {
         "section_stellar": "Гаманці Stellar",
         "more_wallets": "Більше гаманців ({count})",
         "status": {
+            "checking": "Перевірка…",
             "connecting": "Підключення…",
             "locked": "Заблоковано",
             "unavailable": "Недоступний",

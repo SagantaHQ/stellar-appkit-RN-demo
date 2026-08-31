@@ -40,6 +40,7 @@ const pl = {
         "section_stellar": "Portfele Stellar",
         "more_wallets": "Więcej portfeli ({count})",
         "status": {
+            "checking": "Sprawdzam…",
             "connecting": "Łączenie…",
             "locked": "Zablokowany",
             "unavailable": "Niedostępny",

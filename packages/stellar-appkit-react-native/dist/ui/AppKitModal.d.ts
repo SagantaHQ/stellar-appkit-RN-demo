@@ -70,6 +70,12 @@
  *   is the ONLY trigger — never fires on errors/rejections (web parity:
  *   the user reads the result and acts on it); opt out with
  *   `autoCloseOnComplete={false}`. See ui/auto-close.ts.
+ * - **Deferred WC warm-up** — the WalletConnect SignClient is pre-warmed
+ *   at modal mount (app start for always-mounted modals) AND on every
+ *   open, both deferred ~150ms: the SDK's module-tree evaluation blocks
+ *   the JS thread for seconds on debug builds, and firing it in the open
+ *   tick would freeze the sheet's layout/entrance animation — the tap
+ *   would look dead for 5-10 seconds. See ui/warm-up.ts.
  *
  * Presentation: @gorhom/bottom-sheet with a backdrop + swipe-to-dismiss
  * (default), or the inline panel. Icons render through `<WalletIcon>` —

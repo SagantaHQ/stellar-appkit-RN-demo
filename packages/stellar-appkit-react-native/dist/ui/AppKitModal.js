@@ -71,6 +71,12 @@ import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "react/jsx-run
  *   is the ONLY trigger — never fires on errors/rejections (web parity:
  *   the user reads the result and acts on it); opt out with
  *   `autoCloseOnComplete={false}`. See ui/auto-close.ts.
+ * - **Deferred WC warm-up** — the WalletConnect SignClient is pre-warmed
+ *   at modal mount (app start for always-mounted modals) AND on every
+ *   open, both deferred ~150ms: the SDK's module-tree evaluation blocks
+ *   the JS thread for seconds on debug builds, and firing it in the open
+ *   tick would freeze the sheet's layout/entrance animation — the tap
+ *   would look dead for 5-10 seconds. See ui/warm-up.ts.
  *
  * Presentation: @gorhom/bottom-sheet with a backdrop + swipe-to-dismiss
  * (default), or the inline panel. Icons render through `<WalletIcon>` —
@@ -84,6 +90,7 @@ import { ConnectError, NetworkMismatchError, onLocaleChange, t } from '@saganta/
 import { buildWalletConnectDeepLink, buildWalletConnectUniversalLink, buildOpenWalletAppLink, getMobileWallet, } from '../deep-links.js';
 import { useAppKit } from './useAppKit.js';
 import { useReducedMotion } from './animations.js';
+import { scheduleWalletConnectWarmUp } from './warm-up.js';
 import { useWalletConnectForegroundRefresh } from '../wc-foreground.js';
 import { useAppFocusReturn } from '../focus-return.js';
 import { copyText } from '../clipboard.js';
@@ -192,6 +199,15 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode 
     // projectId. Named mobile wallets pair through it, so they're hidden
     // when it isn't registered.
     const wcConnector = useMemo(() => client.registry.get('walletconnect'), [client]);
+    // Warm the WalletConnect SignClient at MOUNT, deferred (ui/warm-up.ts).
+    // <AppKitModal> is typically mounted for the whole app lifetime (rendering
+    // null while closed), so this fires at app start: the SDK's module-tree
+    // evaluation and the relay WebSocket handshake complete while the user is
+    // still on the first screen — not on their first "Connect" tap. The settle
+    // window keeps the app's own first paint/animations ahead of the
+    // evaluation's JS-thread blockage; apps that warm the connector themselves
+    // (the RN demo does) just see the idempotent no-op.
+    useEffect(() => scheduleWalletConnectWarmUp(wcConnector), [wcConnector]);
     // ---- onPreviewTransaction installation (web modal client setter) --------
     // The web modal assigns client.onPreviewTransaction when it attaches and
     // warns if an app already installed its own handler. RN mirrors that: the
@@ -277,11 +293,13 @@ export function AppKitModal({ client, open, onClose, theme = defaultTheme, mode 
             setOpenFailed(false);
             setConnectingWallet(null);
             void refreshWallets();
-            // Pre-warm the WalletConnect SignClient while the user is still
-            // scanning the wallet list — the SDK module evaluation + relay
-            // WebSocket handshake then never land on the tap. (Warm-up is
-            // idempotent; apps that already warmed at app start no-op here.)
-            void wcConnector?.warmUp?.();
+            // Re-arm the WalletConnect warm-up on open — DEFERRED (ui/warm-up.ts):
+            // the SDK's module-tree evaluation blocks the JS thread for seconds
+            // on debug builds, so firing it in the open tick would freeze the
+            // sheet's layout/entrance animation and the tap would look dead for
+            // 5-10s. The short settle window lets the sheet paint first; the
+            // warm-up is idempotent, so apps that warmed at app start no-op here.
+            scheduleWalletConnectWarmUp(wcConnector);
         }
         else if (pendingPreviewRef.current) {
             // Web close() parity: a preview still awaiting the user's decision

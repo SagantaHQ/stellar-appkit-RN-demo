@@ -40,6 +40,7 @@ const de = {
         "section_stellar": "Stellar-Wallets",
         "more_wallets": "Weitere Wallets ({count})",
         "status": {
+            "checking": "Prüfe…",
             "connecting": "Verbinde…",
             "locked": "Gesperrt",
             "unavailable": "Nicht verfügbar",

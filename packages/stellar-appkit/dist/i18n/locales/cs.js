@@ -40,6 +40,7 @@ const cs = {
         "section_stellar": "Peněženky Stellar",
         "more_wallets": "Více peněženek ({count})",
         "status": {
+            "checking": "Kontroluji…",
             "connecting": "Připojování…",
             "locked": "Uzamčeno",
             "unavailable": "Nedostupné",

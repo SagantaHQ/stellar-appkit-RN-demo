@@ -40,6 +40,7 @@ const vi = {
         "section_stellar": "Ví Stellar",
         "more_wallets": "Thêm ví ({count})",
         "status": {
+            "checking": "Đang kiểm tra…",
             "connecting": "Đang kết nối…",
             "locked": "Đã khóa",
             "unavailable": "Không khả dụng",
