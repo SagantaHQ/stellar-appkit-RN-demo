@@ -77,11 +77,14 @@
  *   tick would freeze the sheet's layout/entrance animation — the tap
  *   would look dead for 5-10 seconds. See ui/warm-up.ts.
  * - **Auto-open the wallet on sign** (`autoOpenWalletOnSign`, default on)
- *   — the moment a WalletConnect request is queued from this side (sign,
- *   auth entry, SIWS prompt, retry), the paired wallet app opens by
- *   itself, MWA-style: the user lands straight in the wallet's pending
- *   prompt instead of tapping "Open in wallet app". Fires only on NEW
- *   requests (count increases), only while the app is foregrounded, and
+ *   — once the user CONSENTS (taps Sign/Approve in the app's preview
+ *   modal) and the WalletConnect request is actually on the wire, the
+ *   paired wallet app opens by itself, MWA-style: the user lands straight
+ *   in the wallet's pending prompt instead of tapping "Open in wallet
+ *   app". Never fires before consent — the trigger is the connector's
+ *   post-preview dispatch notification, not the sign queue — and a
+ *   request that settles (fails or completes) within the short settle
+ *   window cancels the handoff. Only while the app is foregrounded and
  *   only when a target is derivable — the connect-time pick, or the
  *   wallet the restored session's peer metadata points back to after a
  *   cold restart. Failures are silent; the manual button remains.
@@ -149,17 +152,26 @@ export interface AppKitModalProps {
      */
     autoCloseOnComplete?: boolean;
     /**
-     * Default true: the moment a WalletConnect request is triggered from
-     * this side — a sign, an auth entry, a SIWS prompt — the paired wallet
-     * app is opened automatically (MWA-style: the user lands straight in the
-     * wallet's pending prompt instead of tapping "Open in wallet app" by
-     * hand). Only fires while the app is foregrounded and only when a target
-     * is derivable: the wallet the user picked during connect, or the wallet
-     * the restored session's peer metadata points back to after a cold
-     * restart. The short dispatch delay lets the request reach the relay
-     * before the app backgrounds; failures are silent (the manual button on
-     * the signing view remains as the fallback). Set false to keep the
-     * fully-manual handoff (the button only).
+     * Default true: once the user CONSENTS to a wallet-side request — taps
+     * Sign/Approve in the app's preview modal (a SIWS prompt or a
+     * "Try again" re-approval included) — and the WalletConnect request is
+     * dispatched to the relay, the paired wallet app is opened
+     * automatically (MWA-style: the user lands straight in the wallet's
+     * pending prompt instead of tapping "Open in wallet app" by hand). The
+     * wallet is NEVER opened before the consent: the trigger is the
+     * connector's dispatch notification (fired after the preview gate and
+     * after its pre-checks), not the sign queue, which starts counting the
+     * moment the app calls signTransaction(). A request that settles
+     * within the short settle window — a fast failure (dead session) or an
+     * instant answer — cancels the handoff: there is nothing waiting in
+     * the wallet to switch to. Only fires while the app is foregrounded
+     * and only when a target is derivable: the wallet the user picked
+     * during connect, or the wallet the restored session's peer metadata
+     * points back to after a cold restart. The short settle delay lets the
+     * request reach the relay before the app backgrounds; failures are
+     * silent (the manual button on the signing view remains as the
+     * fallback). Set false to keep the fully-manual handoff (the button
+     * only).
      */
     autoOpenWalletOnSign?: boolean;
 }
