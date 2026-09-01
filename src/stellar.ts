@@ -67,7 +67,19 @@ export async function buildSelfPaymentXdr(address: string, sequence: string): Pr
   return tx.toXDR();
 }
 
-/** Builds an unsigned TESTNET payment to an arbitrary recipient + amount. */
+/**
+ * Builds an unsigned TESTNET payment to an arbitrary recipient + amount.
+ *
+ * Timebounds are 300s (5 minutes), not the 30s you often see in docs:
+ * between building here and Horizon submission the transaction must survive
+ * the full WalletConnect roundtrip — modal preview, the user tapping sign,
+ * the wallet app opening, its own review sheet and biometrics — which
+ * routinely takes more than 30 seconds on mobile. A 30s window expires
+ * mid-flight and Horizon answers `tx_too_late` ("ledger closeTime is past
+ * the tx maxTime"). 300s matches the self-payment flow and still bounds
+ * replay exposure. If even that expires, the submit error tells the user
+ * to tap Send again — this helper rebuilds with fresh sequence + bounds.
+ */
 export async function buildPaymentXdr(
   source: string,
   sequence: string,
@@ -93,7 +105,7 @@ export async function buildPaymentXdr(
         amount,
       })
     )
-    .setTimeout(30)
+    .setTimeout(300)
     .build();
   return tx.toXDR();
 }
@@ -129,6 +141,20 @@ export async function submitSignedTx(signedTxXdr: string): Promise<SubmitResult>
     const codes = data.extras?.result_codes;
     const txCode = codes?.transaction ?? data.title ?? `Horizon ${res.status}`;
     const opCodes = codes?.operations ?? [];
+    // Timebound failures get a plain-language cause + recovery path — the
+    // raw code (`tx_too_late` = ledger closeTime past the tx maxTime) tells
+    // the user nothing about what to do next. Retrying is safe: sendXlmDemo
+    // re-fetches the sequence and rebuilds with fresh timebounds.
+    if (txCode === 'tx_too_late' || txCode === 'tx_too_early') {
+      throw new Error(
+        'The transaction expired while it was being signed in your wallet (tx_too_late). Tap Send again — a fresh transaction will be built.'
+      );
+    }
+    if (txCode === 'tx_bad_seq') {
+      throw new Error(
+        'The account moved on while this transaction was in flight (tx_bad_seq). Tap Send again — the latest sequence number will be used.'
+      );
+    }
     throw new Error(
       `Transaction rejected by network (tx: ${txCode}${opCodes.length ? `, ops: ${opCodes.join(', ')}` : ''})`
     );
