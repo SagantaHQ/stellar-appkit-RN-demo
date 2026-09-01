@@ -21,6 +21,7 @@
     "@saganta/stellar-appkit-siws-verify": "file:packages/stellar-appkit-siws-verify",
     "@stellar/stellar-sdk": "^13.0.0",
     "@walletconnect/react-native-compat": "2.23.10",
+    "@walletconnect/sign-client": "2.23.10",
     "buffer": "^6.0.3",
     "expo": "~57.0.17",
     "expo-application": "~57.0.2",

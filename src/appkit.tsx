@@ -294,15 +294,15 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
     });
   }, [albedoBridge, xbullBridge, siwsEnabled, siwsConfig]);
 
-  // Pre-warm WalletConnect at app start: the SignClient's module tree
-  // evaluation + relay WebSocket handshake then complete while the user is
-  // still on the home screen — instead of freezing the first wallet tap for
-  // seconds (warmUp is idempotent and swallows errors; a cold connector just
-  // retries on the user's tap). The modal warms again on open as a no-op
-  // safety net for apps that skip this.
-  useEffect(() => {
-    void client.registry.get('walletconnect')?.warmUp?.();
-  }, [client]);
+  // WalletConnect warm-up: NOT fired here anymore. The entry file
+  // (index.ts) eagerly evaluates the SDK module behind the splash screen
+  // (the "Zero startup freeze" pattern from the RN README) — an immediate
+  // warm-up effect here would have paid the same synchronous evaluation
+  // right after the first paint instead, leaving every button dead for
+  // ~10s on a debug Expo Go build. The always-mounted modal still schedules
+  // its own deferred warm-ups (interaction-gated, ~2s settle at mount /
+  // ~150ms on open); against the pre-evaluated module those are cheap, and
+  // SignClient.init() is what they actually run.
 
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);

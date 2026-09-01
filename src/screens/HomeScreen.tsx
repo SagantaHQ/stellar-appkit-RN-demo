@@ -4,7 +4,9 @@
  * One card per capability, mirroring the web demo suite:
  *   1. Connect / session  — open the AppKit modal (bottom sheet or inline):
  *                           21 deep-link mobile wallets, Albedo + xBull via
- *                           WebView, live TESTNET balance.
+ *                           WebView, live TESTNET balance. autoConnect: true
+ *                           on the client — restarts resume the connection
+ *                           (and a still-valid SIWS session) on their own.
  *   2. Language           — all 25 core locales, live-switched (the modal,
  *                           preview, account view and SIWS screens all
  *                           translate instantly; the device language is the
@@ -15,11 +17,17 @@
  *                           like the web SDK, then the wallet prompt.
  *   4. Send XLM           — build → preview → sign → SUBMIT to Testnet. The
  *                           recipient really receives the XLM.
- *   5. SIWS               — Sign-In With Stellar: connect + sign-in + real
- *                           signature verification (the siws-verify package
- *                           runs as an on-device "server"), session status.
- *   6. Testnet funds      — friendbot faucet + balance refresh.
- *   7. Theme              — all 10 modal themes, live-switched.
+ *   5. SIWS               — Sign-In With Stellar, ALL in the demo app: the
+ *                           "Sign in with wallet" button runs the exact
+ *                           modal flow (nonce → wallet sign through the
+ *                           preview → verifySiws on-device with the real
+ *                           siws-verify package). Session status + sign-out.
+ *   6. In-app browser     — the WebView screen (URL chip / Reload /
+ *                           Open-in-browser) the modal also uses for web
+ *                           links; explorer/install/footer links stay
+ *                           in-app.
+ *   7. Testnet funds      — friendbot faucet + balance refresh.
+ *   8. Theme              — all 10 modal themes, live-switched.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {

@@ -72,17 +72,21 @@ export interface StellarAppKitConfig {
     /** Set false to disable cross-tab session sync (on by default, no-ops where BroadcastChannel isn't available anyway). */
     syncAcrossTabs?: boolean;
     /**
-     * Auto-connect on construction: schedules `restore()` immediately, so a
-     * persisted wallet session reconnects (and, when `siws` is configured, a
-     * still-valid SIWS session logs back in) without the app wiring its own
-     * mount-effect `client.restore()` call. Fire-and-forget: restore() is
-     * designed to silently drop anything it can't bring back. Default false —
-     * apps that prefer explicit control keep calling `restore()` themselves
-     * (calling both is harmless; the second restore sees the same storage).
+     * Auto-connect on construction: schedules `restore()`, so a persisted
+     * wallet session reconnects (and, when `siws` is configured, a still-valid
+     * SIWS session logs back in) without the app wiring its own mount-effect
+     * `client.restore()` call. Fire-and-forget: restore() is designed to
+     * silently drop anything it can't bring back. Default false — apps that
+     * prefer explicit control keep calling `restore()` themselves (calling
+     * both is harmless; the second restore sees the same storage).
      *
      * On React Native this is the "auto connect and login" switch: pair once,
      * then every app start resumes connected (and signed in, when SIWS is
-     * configured and the session hasn't expired).
+     * configured and the session hasn't expired). The restore is deferred ~1.2s
+     * there (after the app's first paint): with a persisted WalletConnect
+     * session the restore chain evaluates the whole WC SDK synchronously, and
+     * firing that in the constructor froze the freshly-started app's JS thread
+     * — every button dead for ~10s. Web restores immediately.
      */
     autoConnect?: boolean;
     /** Called before every signTransaction() with a decoded preview — return false to cancel before the wallet ever sees the request. `ui-web`'s modal sets this automatically when attached. */

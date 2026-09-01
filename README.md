@@ -91,8 +91,12 @@ which requires a project id:
 - **Modal presentation toggle** — "Modal presentation" switches between the default
   bottom sheet and `mode="inline"`: the same panel embedded in the page as a bordered
   card (web `mode="inline"` parity — no overlay, no close button, always visible).
-- **Session** — address, wallet identity, live TESTNET balance from Horizon,
-  `AsyncStorage`-backed persistence (sessions survive app restarts).
+- **Session & auto-connect** — address, wallet identity, live TESTNET balance from Horizon,
+  `AsyncStorage`-backed persistence. The client is built with `autoConnect: true`, so a
+  restart resumes the connection (and a still-valid SIWS session) on its own — pair once,
+  then every app start comes back connected; on React Native the restore is scheduled
+  ~1.2s after construction so it never races the app's first paint (its WalletConnect
+  rehydrate path evaluates the SDK synchronously — see the troubleshooting table).
 - **`signMessage()`** — signs the demo message through the connected wallet (via the
   preview) and shows the signature plus `signedData` (the exact bytes the wallet
   signed — what a SIWS verifier needs).
@@ -104,14 +108,16 @@ which requires a project id:
   recipient + amount (empty recipient sends to yourself), build the payment, approve
   the preview, let the wallet sign, then submit the envelope to TESTNET Horizon —
   the recipient actually receives the XLM, and the result links to the explorer.
-- **SIWS (Sign-In With Stellar)** — toggle SIWS on and the full sign-in flow runs after
-  connect (checking session → fetching nonce → approve in wallet → verifying, with
-  retry caps and per-step timeouts, phase for phase like the web modal). No backend
-  needed: the nonce is generated on-device and the signature is verified by the real
-  `@saganta/stellar-appkit-siws-verify` package running as an on-device "server"
-  (Node's `crypto` is provided by `src/node-crypto-shim.js`, a `@noble/hashes`-backed
-  createHash routed in `metro.config.js`). The session persists in `AsyncStorage` and
-  the card shows the signed-in address + expiry with a Sign-out button.
+- **SIWS (Sign-In With Stellar)** — signing AND verification, all in the demo app: the
+  SIWS card's direct "Sign in with wallet" button runs the exact flow the modal runs
+  (nonce → `client.signIn()` through the preview → verify), and the signature is verified
+  on-device by the real `@saganta/stellar-appkit-siws-verify` package (the same code a
+  backend would run — Node's `crypto` is provided by `src/node-crypto-shim.js`, a
+  `@noble/hashes`-backed createHash routed in `metro.config.js`). No browser round trip,
+  no backend: the nonce is generated on-device and the issued session (10 min) persists
+  in `AsyncStorage`; the card shows the signed-in address + expiry with a Sign-out
+  button. Toggling SIWS off/on rebuilds the client — autoConnect re-restores from the
+  same storage, so the connection survives the toggle like a restart.
 - **Return focus after the wallet answers** — the deep-link handoff puts the user inside the wallet
   app to approve or reject; the moment they answer, the demo re-gains focus instead of leaving them
   staring at the wallet. `appMetadata.redirect` (the app.json `scheme`) rides every WalletConnect
@@ -134,17 +140,19 @@ which requires a project id:
   with the focus-return bullet above it's one round trip: the wallet backgrounds itself, the
   sheet gets out of the way, your app's UI is what's waiting.
 - **Themed in-app browser** — a new "In-app browser" card + every web link in the
-  modal (explorer, wallet install pages, the footer) opens in a themed Chrome Custom
-  Tab / SFSafariViewController — modal `pageSheet` on iOS, themed toolbars on Android —
-  instead of the heavy WebView. Preference chain: `react-native-inappbrowser-reborn`
-  (dev-client / EAS builds; full modal styling + `isAvailable()` Chrome Tab detection)
-  → `expo-web-browser` (bundled with Expo Go) → external browser. The card shows which
-  surface won on the device and whether Custom Tabs were detected. Why: the system
-  browser supports **passkeys** (WKWebView/Android WebView do not — verified against
-  Apple's and Chrome's own docs) and shares the browser's cookie jar, so a wallet
-  already unlocked in the user's browser stays unlocked. Albedo and xBull keep the
-  in-app WebView for their flows because their popup protocols are postMessage-coupled
-  to the opener window — a Custom Tab has no such channel back into the app.
+  modal (explorer, wallet install pages, the footer) opens in a themed **in-app WebView**
+  — the same full-screen screen + browser toolbar (URL chip with tap-to-copy, Reload,
+  Open-in-browser) the Albedo and xBull screens carry, so switching the theme below
+  restyles it live. `createWebBrowser(setBrowserView)` builds the session; the element
+  renders at the app root like the Albedo/xBull views; one page at a time; non-http(s)
+  URLs are refused. The toolbar's Open-in-browser button hands pages that genuinely need
+  the system browser (e.g. passkey logins — WKWebView/Android WebView don't support them)
+  to the OS. The old Chrome-Custom-Tab surface (`react-native-inappbrowser-reborn` →
+ `expo-web-browser`) was removed: a Custom Tab has no message channel back into the app
+  (so postMessage-coupled wallet protocols can't run there), and its native module isn't
+  compiled into Expo Go anyway — every open silently degraded to a fallback, so the
+  dependency bought nothing. Albedo and xBull always used the in-app WebView for their
+  flows and are unaffected.
 - **Friendbot faucet** — one-tap "Get Testnet funds" in the demo (and in the modal's
   account view) credits 10,000 test XLM.
 - **Theming** — all 10 modal themes (`minimal/stellar/sky/ocean/sunset` × dark/light) applied
@@ -158,13 +166,13 @@ The interesting files, in the order the app loads them:
 
 | File | What it shows |
 |---|---|
-| `index.ts` | Entry point — imports `./src/polyfills` **before** everything else. |
+| `index.ts` | Entry point — imports `./src/polyfills` **before** everything else, then eagerly fires `import('@walletconnect/sign-client')` (fire-and-forget) so the SDK's synchronous module evaluation is paid **behind the splash screen, before React's first render** — the "Zero startup freeze" pattern (see Troubleshooting). |
 | `src/polyfills.ts` | The Expo Go-safe polyfill dance (see below). |
-| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, the WalletConnect warm-up + session restore, theme + locale state, the SIWS "server-in-your-pocket" config (nonce/session/verify/signout backed by AsyncStorage + `siws-verify`), and the themed in-app browser session (`createThemedBrowserSession` with reborn + expo-web-browser injected, rebuilt per theme, pre-warmed at startup). |
-| `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` at the root. |
+| `src/appkit.tsx` | One `StellarAppKit` client: `defaultReactNativeConnectors()`, `createAsyncStorage(AsyncStorage)`, the Albedo + xBull WebView bridges, `autoConnect: true` (restarts resume the connection + a still-valid SIWS login), the SIWS "server-in-your-pocket" config (nonce/session/verify/signout backed by AsyncStorage + `siws-verify`) with a direct `siwsSignIn()` for the card, the in-app web browser session (`createWebBrowser`), theme + locale state. No warm-up effect — the modal schedules its own deferred warm-ups against the pre-evaluated SDK. |
+| `App.tsx` | Root wiring: `GestureHandlerRootView` (required by bottom-sheet), the always-mounted modal, and `{albedoView}` / `{xbullView}` / `{browserView}` at the root. |
 | `src/stellar.ts` | Demo Stellar helpers — plain Horizon `fetch` for account/balance, stellar-sdk XDR builders, `submitSignedTx()` (REST submit), friendbot faucet, SIWS nonce (AppKit signs; building/submitting XDR is your app's job). |
 | `src/node-crypto-shim.js` | `createHash('sha256'/'sha512')` via `@noble/hashes` — stands in for Node's `crypto` so `siws-verify` runs on-device (routed in metro.config.js). |
-| `src/screens/HomeScreen.tsx` | The demo UI — connect/session, language, focus-return card, sign (message + self-payment), send XLM (sign + submit), SIWS, in-app browser, friendbot, theme. |
+| `src/screens/HomeScreen.tsx` | The demo UI — connect/session + auto-connect, language, focus-return card, sign (message + self-payment), send XLM (sign + submit), SIWS (direct in-app sign-in), in-app browser, friendbot, theme. |
 | `scripts/test-siws-e2e.mjs` | Node-run e2e proof of the SIWS verification path (valid sign-in, wrong nonce/domain, foreign signature, SEP-0053 hashed signing). |
 | `metro.config.js` | Five Expo Go-specific resolver tweaks (see below). |
 
@@ -279,6 +287,7 @@ Notes:
 
 | Symptom | Fix |
 |---|---|
+| After the app loads, every button is dead for ~10 seconds (taps do nothing, then everything works) | **Fixed in this repo.** Root cause: the WalletConnect SDK's module evaluation is a *synchronous* `require` the first time any code path reaches it — on a debug Expo Go build that's seconds of frozen JS thread, and it fired right as the first screen painted (the modal's mount warm-up, the removed immediate warm-up effect, and — with a previously paired wallet — `autoConnect`'s restore chain all converged there). Two fixes landed: (1) `index.ts` now fires `import('@walletconnect/sign-client')` eagerly, right after the polyfills — the evaluation is paid **behind the splash screen, before React's first render**, where a slow load just looks like a slow load, and Metro caches the module so every later path requires it instantly; (2) the library defers its own triggers (modal mount warm-up ~2s after interactions; the autoConnect restore ~1.2s after construction on RN). If you still see it after `git pull`: `bun install && bunx expo start --clear`. In your own app, copy the eager-import line from `index.ts` (it must run after polyfills). Note release/EAS builds evaluate the minified bundle much faster — this is mostly a debug-build pain. |
 | `Unable to resolve module @trezor/connect-web` (custom setups) | Keep the `metro.config.js` stubs — see the comments in that file. |
 | `crypto.getRandomValues` errors | Make sure `./src/polyfills` is imported before anything else in `index.ts`. |
 | WalletConnect pairing says "Project not found" / code 3000 | Wrong/missing `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` — fix `.env` and fully restart the dev server. |
