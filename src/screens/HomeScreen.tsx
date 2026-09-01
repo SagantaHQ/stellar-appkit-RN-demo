@@ -31,7 +31,13 @@ import {
 } from 'react-native';
 import { useAppKit, WalletIcon, AppKitModal } from '@saganta/stellar-appkit-react-native/ui';
 import type { SiwsSession } from '@saganta/stellar-appkit-react-native';
-import { DEMO_MESSAGE, DEMO_PAYMENT_AMOUNT, DOCS_URL, LIBRARY_URL } from '../constants';
+import {
+  DEMO_MESSAGE,
+  DEMO_PAYMENT_AMOUNT,
+  DEMO_RECIPIENT,
+  DOCS_URL,
+  LIBRARY_URL,
+} from '../constants';
 import { LOCALES, THEMES, useAppKitDemo } from '../appkit';
 import {
   Badge,
@@ -86,7 +92,7 @@ export function HomeScreen() {
   const [busy, setBusy] = useState<'message' | 'transaction' | null>(null);
 
   // Send-XLM example state
-  const [recipient, setRecipient] = useState('');
+  const [recipient, setRecipient] = useState(DEMO_RECIPIENT);
   const [amount, setAmount] = useState('1');
   const [sendBusy, setSendBusy] = useState<'building' | 'signing' | 'submitting' | null>(null);
   const [sendResult, setSendResult] = useState<{ hash: string; explorerUrl: string } | null>(null);
@@ -212,8 +218,17 @@ export function HomeScreen() {
     setActionError(null);
     setSendResult(null);
     try {
-      const info = await fetchAccountInfo(state.session.address);
       const target = recipient.trim() || state.session.address;
+      // Pre-flight: fail fast if the recipient doesn't exist on TESTNET.
+      // A `Payment` op to an unfunded destination returns `op_no_destination`
+      // at submit time — which would mean a full WC roundtrip (modal preview,
+      // approve, wallet app switch, biometrics) wasted just to get the
+      // rejection. `fetchAccountInfo` throws a clear 404 message we can surface
+      // directly. Sending-to-self is still fine (the source is funded).
+      if (target !== state.session.address) {
+        await fetchAccountInfo(target);
+      }
+      const info = await fetchAccountInfo(state.session.address);
       const xdr = await buildPaymentXdr(info.address, info.sequence, target, amount.trim());
 
       setSendBusy('signing');
@@ -477,12 +492,13 @@ export function HomeScreen() {
           </BodyText>
           <MutedText theme={theme}>
             Builds a real payment, signs it through the modal preview, then submits it to Horizon Testnet —
-            the recipient actually receives the XLM. Empty recipient = send to yourself. Need funds? Use
-            the faucet below.
+            the recipient actually receives the XLM. The default recipient is a long-funded Testnet account
+            (so just tapping Send works); clear it to send to yourself, or type any funded Testnet address.
+            Need funds? Use the faucet below.
           </MutedText>
           <Field
             theme={theme}
-            label={`Recipient (defaults to yourself)`}
+            label={`Recipient (clear to send to yourself)`}
             value={recipient}
             onChangeText={setRecipient}
             placeholder={`G… (your address)`}

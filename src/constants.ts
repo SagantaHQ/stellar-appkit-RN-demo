@@ -46,3 +46,12 @@ export const DEMO_MESSAGE =
 
 /** Demo payment amount (XLM) — sent to your own address, so it only costs fees. */
 export const DEMO_PAYMENT_AMOUNT = '0.0001';
+
+/**
+ * Default Send XLM recipient — a long-lived funded TESTNET account. Mirrors
+ * the web demo's send-xlm page so that "just tap Send" works the same in
+ * both demos; the field is editable, so users can send to themselves or
+ * any other funded TESTNET account. Send-to-self is still the placeholder
+ * hint and remains the documented fallback when the field is cleared.
+ */
+export const DEMO_RECIPIENT = 'GD5G3X25PD6IS3KEUV3QFF2BYXUY2OIUPIV5A5TMX4DSKASDN3EG7CJ6';

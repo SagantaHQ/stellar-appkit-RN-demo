@@ -155,6 +155,18 @@ export async function submitSignedTx(signedTxXdr: string): Promise<SubmitResult>
         'The account moved on while this transaction was in flight (tx_bad_seq). Tap Send again — the latest sequence number will be used.'
       );
     }
+    // op_no_destination / op_no_trust: the operation referenced an account
+    // that doesn't exist on the network (a `Payment` to an unfunded address,
+    // or a non-native asset whose trustline isn't established). Caught here as
+    // a safety net — sendXlmDemo pre-flights the recipient's existence, but a
+    // race (account merged between check and submit) or an asset-mismatch can
+    // still surface the code at submit time.
+    if (opCodes.includes('op_no_destination') || opCodes.includes('op_no_trust')) {
+      const which = opCodes.includes('op_no_destination') ? 'op_no_destination' : 'op_no_trust';
+      throw new Error(
+        `Recipient isn't a funded TESTNET account (${which}). Fund the address first via the faucet (friendbot.stellar.org), send to yourself, or use a different address.`
+      );
+    }
     throw new Error(
       `Transaction rejected by network (tx: ${txCode}${opCodes.length ? `, ops: ${opCodes.join(', ')}` : ''})`
     );
