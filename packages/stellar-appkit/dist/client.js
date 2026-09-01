@@ -181,6 +181,13 @@ export class StellarAppKit {
                 void this.resyncFromStorage();
             });
         }
+        // Auto-connect: schedule restore() so persisted sessions (and a valid
+        // SIWS session, when configured) come back without the app wiring a
+        // mount effect. Restore never throws by design; the catch is pure
+        // belt-and-braces for storage adapters that reject outside its try/catch.
+        if (config.autoConnect) {
+            void this.restore().catch(() => undefined);
+        }
     }
     /** Get the current SIWS session (null if not authenticated or expired). */
     get siwsSession() {

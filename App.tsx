@@ -12,8 +12,9 @@
  * - In the "inline" presentation (web `mode="inline"` parity) the panel is
  *   embedded inside the HomeScreen scroll instead — no overlay at all — so
  *   the root renders nothing modal.
- * - `{albedoView}` renders the Albedo confirm WebView on demand and
- *   `{xbullView}` the xBull web wallet — the bridges hand us ready-made
+ * - `{albedoView}` renders the Albedo confirm WebView on demand,
+ *   `{xbullView}` the xBull web wallet, and `{browserView}` the in-app web
+ *   browser (explorer/install/docs links) — the bridges hand us ready-made
  *   screen elements; they must live at the app root so they can cover
  *   whatever is on screen.
  */
@@ -39,7 +40,7 @@ function isDarkColor(hex: string): boolean {
 }
 
 function Root() {
-  const { client, modalOpen, closeModal, albedoView, xbullView, theme, presentation, browser } = useAppKitDemo();
+  const { client, modalOpen, closeModal, albedoView, xbullView, browserView, theme, presentation, browser } = useAppKitDemo();
   return (
     <View style={[styles.root, { backgroundColor: theme.colorBg }]}>
       <StatusBar style={isDarkColor(theme.colorBg) ? 'light' : 'dark'} />
@@ -49,9 +50,8 @@ function Root() {
 
       {/* Bottom-sheet presentation — always mounted, see the comment atop
           this file. The inline presentation renders inside HomeScreen. The
-          themed browser prop makes explorer/install/footer links open in a
-          themed Chrome Custom Tab / SFSafariViewController instead of
-          leaving the app. */}
+          browser prop makes explorer/install/footer links open in the
+          in-app WebView instead of leaving the app. */}
       {presentation === 'bottomsheet' && (
         <AppKitModal
           client={client}
@@ -62,9 +62,11 @@ function Root() {
         />
       )}
 
-      {/* Albedo + xBull WebView screens (rendered on demand by the bridges). */}
+      {/* Albedo + xBull WebView screens, and the in-app web browser —
+          all rendered on demand by their bridges/sessions. */}
       {albedoView}
       {xbullView}
+      {browserView}
     </View>
   );
 }

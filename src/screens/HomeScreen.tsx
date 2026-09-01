@@ -81,6 +81,8 @@ export function HomeScreen() {
     setAppLocale,
     siwsEnabled,
     setSiwsEnabled,
+    siwsSignIn,
+    siwsSigningIn,
     browser,
   } = useAppKitDemo();
   const state = useAppKit(client);
@@ -102,9 +104,6 @@ export function HomeScreen() {
   const [fundBusy, setFundBusy] = useState(false);
   const [fundMessage, setFundMessage] = useState<string | null>(null);
   const wasPending = useRef(false);
-
-  // In-app browser detection state (the card shows which surface won).
-  const [chromeTabs, setChromeTabs] = useState<boolean | null>(null);
 
   const connected = state.status === 'connected' && state.session != null;
 
@@ -146,25 +145,6 @@ export function HomeScreen() {
     const off = client.on('siwsSessionChange', update);
     return off;
   }, [client]);
-
-  // ------------------------------------------------- in-app browser detection --
-  // Which system surface won on this device: reborn's Chrome Tab when the
-  // native module exists (dev-client / EAS builds), expo-web-browser's
-  // Custom Tabs in Expo Go, external browser as the last resort.
-  useEffect(() => {
-    let alive = true;
-    browser
-      .isChromeTabsAvailable()
-      .then((available) => {
-        if (alive) setChromeTabs(available);
-      })
-      .catch(() => {
-        if (alive) setChromeTabs(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [browser]);
 
   // ------------------------------------------------------------- actions ----
   const signMessageDemo = useCallback(async () => {
@@ -549,10 +529,12 @@ export function HomeScreen() {
           SIWS — Sign-In With Stellar
         </BodyText>
         <MutedText theme={theme}>
-          Wallet-based sign-in: after connecting, the modal runs the sign-in flow (checking session → nonce
-          → approve in wallet → verifying) and the signature is verified with the real{' '}
-          <MonoText theme={theme}>siws-verify</MonoText> package running as an on-device server. Production
-          apps move session/nonce/verify to a backend.
+          Wallet-based sign-in, all inside the demo app: the demo builds the SIWS message, your wallet signs it
+          (via the modal preview — you consent before anything is sent), and the signature is verified with the
+          real{' '}
+          <MonoText theme={theme}>siws-verify</MonoText> package running on-device. Signing and verification
+          never leave the demo — production apps move the session/nonce/verify half to a backend, the message
+          format stays the same. Auto-connect restores a still-valid session on restart (auto-login).
         </MutedText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
           <Chip
@@ -577,10 +559,22 @@ export function HomeScreen() {
                 <Button theme={theme} label="Sign out" tone="danger" onPress={siwsSignOut} />
               </View>
             ) : (
-              <MutedText theme={theme}>
-                Not signed in yet — open the modal and reconnect (or disconnect and connect again) to run
-                the sign-in flow.
-              </MutedText>
+              <View style={{ gap: 8 }}>
+                <MutedText theme={theme}>
+                  Not signed in yet — sign in directly here, or reconnect through the modal (both run the same
+                  flow).
+                </MutedText>
+                <Button
+                  theme={theme}
+                  label={siwsSigningIn ? 'Signing in…' : 'Sign in with wallet'}
+                  disabled={siwsSigningIn}
+                  onPress={() => {
+                    void siwsSignIn().catch((err: unknown) => {
+                      setActionError(err instanceof Error ? err.message : String(err));
+                    });
+                  }}
+                />
+              </View>
             )
           ) : (
             <MutedText theme={theme}>Connect a wallet to sign in.</MutedText>
@@ -588,35 +582,24 @@ export function HomeScreen() {
         ) : null}
       </Card>
 
-      {/* in-app browser — themed Chrome Custom Tab / SFSafariViewController */}
+      {/* in-app browser — the WebView screen with browser chrome */}
       <Card theme={theme}>
         <BodyText theme={theme} style={{ fontWeight: '700' }}>
           In-app browser
         </BodyText>
         <MutedText theme={theme}>
-          Web links (explorer, wallet install pages, the modal footer) open in a themed Chrome Custom Tab /
-          SFSafariViewController instead of the heavy WebView — the system browser supports passkeys, which
-          the WebView cannot, and shares the browser&apos;s wallet session. Preference chain:
-          react-native-inappbrowser-reborn (dev-client / EAS builds) → expo-web-browser (Expo Go) → external
-          browser. Albedo and xBull still use the in-app WebView because their popups talk postMessage to the
-          opener window — a Custom Tab has no such channel back into the app.
+          Web links (explorer, wallet install pages, the modal footer) open in an in-app WebView — full-screen,
+          with the same browser toolbar as the Albedo and xBull screens: the URL chip (tap to copy), Reload, and
+          Open-in-browser (for pages that need the system browser, e.g. passkey logins). The Chrome-Custom-Tab
+          surface was removed: it has no message channel back for wallet protocols and its native module
+          doesn&apos;t exist in Expo Go.
         </MutedText>
-        <Row
-          theme={theme}
-          label="Preferred surface"
-          value={browser.surface === 'reborn' ? 'inappbrowser-reborn' : browser.surface === 'expo' ? 'expo-web-browser' : 'external browser'}
-        />
-        <Row
-          theme={theme}
-          label="Chrome Custom Tabs"
-          value={chromeTabs === null ? 'detecting…' : chromeTabs ? 'available' : 'not detected'}
-          danger={chromeTabs === false}
-        />
+        <Row theme={theme} label="Surface" value="in-app WebView (react-native-webview)" />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Button
               theme={theme}
-              label="Open the docs (themed)"
+              label="Open the docs (in-app)"
               tone="secondary"
               onPress={() => void browser.open(DOCS_URL)}
             />

@@ -30,5 +30,5 @@ export { isReactNativeRuntime } from './platform.js';
 export { attachWalletConnectForegroundRefresh, } from './wc-foreground.js';
 export { attachAppFocusReturn, resolveAppFocusTarget, shouldAttemptAppFocus, FOCUS_ATTEMPT_COOLDOWN_MS, } from './focus-return.js';
 export { detectDeviceLocale, applyDeviceLocale, normalizeToDeviceLocale, } from './locale.js';
-export { createThemedBrowserSession, buildRebornOptions, buildExpoOptions, } from './browser/inapp-browser.js';
+export { createWebBrowser, isHttpUrl, } from './browser/web-view-browser.js';
 //# sourceMappingURL=index.js.map

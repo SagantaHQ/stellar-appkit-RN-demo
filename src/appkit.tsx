@@ -33,22 +33,20 @@ import React, {
   type ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import InAppBrowser from 'react-native-inappbrowser-reborn';
-import * as ExpoWebBrowser from 'expo-web-browser';
 import {
   StellarAppKit,
   applyDeviceLocale,
   createAlbedoWebViewConnector,
   createXBullWebViewConnector,
   createAsyncStorage,
-  createThemedBrowserSession,
+  createWebBrowser,
   defaultReactNativeConnectors,
   setLocale,
   getLocale,
   onLocaleChange,
   type LocaleCode,
   type SiwsSession,
-  type ThemedBrowserSession,
+  type WebBrowserSession,
 } from '@saganta/stellar-appkit-react-native';
 import { verifySiws } from '@saganta/stellar-appkit-siws-verify';
 import { createAlbedoWebViewBridge } from '@saganta/stellar-appkit-react-native/albedo';
@@ -131,6 +129,8 @@ interface AppKitDemoContextValue {
   albedoView: ReactElement | null;
   /** The xBull web-wallet screen — MUST be rendered at the app root. */
   xbullView: ReactElement | null;
+  /** The in-app web browser screen (explorer/install/docs links) — render at the app root. */
+  browserView: ReactElement | null;
   /** True when EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID is set. */
   walletConnectConfigured: boolean;
   /** Currently selected modal theme (also drives the app chrome). */
@@ -146,12 +146,16 @@ interface AppKitDemoContextValue {
   /** SIWS toggle — rebuilding the client with/without the siws config. */
   siwsEnabled: boolean;
   setSiwsEnabled: (on: boolean) => void;
+  /** Runs the SIWS sign-in directly from the demo card (nonce → wallet sign → on-device verify). */
+  siwsSignIn: () => Promise<SiwsSession | null>;
+  /** True while the direct SIWS sign-in is in flight. */
+  siwsSigningIn: boolean;
   /**
-   * The themed in-app browser (Chrome Custom Tabs / SFSafariViewController,
-   * styled like a modal from the active theme). Passed to the modal so
-   * explorer/install/footer links open in-app, and usable directly.
+   * The in-app web browser (the themed-WebView screen with the URL-chip /
+   * Reload / Open-in-browser toolbar). Passed to the modal so explorer,
+   * install and footer links open in-app, and usable directly.
    */
-  browser: ThemedBrowserSession;
+  browser: WebBrowserSession;
 }
 
 const AppKitDemoContext = createContext<AppKitDemoContextValue | null>(null);
@@ -160,10 +164,12 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [albedoView, setAlbedoView] = useState<ReactElement | null>(null);
   const [xbullView, setXBullView] = useState<ReactElement | null>(null);
+  const [browserView, setBrowserView] = useState<ReactElement | null>(null);
   const [themeId, setThemeId] = useState('stellarDark');
   const [presentation, setPresentation] = useState<'bottomsheet' | 'inline'>('bottomsheet');
   const [locale, setLocaleState] = useState<LocaleCode>(getLocale());
-  const [siwsEnabled, setSiwsEnabled] = useState(false);
+  const [siwsEnabled, setSiwsEnabled] = useState(true);
+  const [siwsSigningIn, setSiwsSigningIn] = useState(false);
 
   // Follow the device language at startup — unsupported languages keep
   // English. The switcher below can then override at any time.
@@ -276,6 +282,13 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
         ...(APP_REDIRECT ? { redirect: { native: APP_REDIRECT } } : {}),
       },
       storage: createAsyncStorage(AsyncStorage),
+      // Auto-connect AND auto-login: the constructor schedules restore(), so
+      // app restarts resume the persisted wallet connection (and, while the
+      // demo's SIWS session is still valid, the sign-in) without any
+      // mount-effect wiring. The client is also rebuilt when the SIWS toggle
+      // flips — the new client re-restores from the same storage, so the
+      // connection survives the toggle exactly like a restart.
+      autoConnect: true,
       connectors,
       ...(siwsEnabled ? { siws: siwsConfig } : {}),
     });
@@ -291,15 +304,6 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
     void client.registry.get('walletconnect')?.warmUp?.();
   }, [client]);
 
-  // Restore any persisted wallet session after (re)creating the client —
-  // app restarts AND the SIWS toggle (which rebuilds the client with the
-  // siws config) recover the connection instead of forcing a reconnect.
-  // Sessions persist through createAsyncStorage, so the new client sees
-  // the same storage.
-  useEffect(() => {
-    void client.restore();
-  }, [client]);
-
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
 
@@ -313,32 +317,43 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * The themed system-browser session. Adapters are INJECTED (Metro
-   * resolves static requires at bundle time — the library can't require
-   * them itself):
-   * - react-native-inappbrowser-reborn — full modal styling + Chrome Tab
-   *   detection; its native module exists in dev-client/EAS builds (the
-   *   demo already ships expo-dev-client)
-   * - expo-web-browser — the same OS surfaces, bundled with Expo Go
-   * The session degrades at runtime: reborn throwing (no native module in
-   * Expo Go) falls straight to expo-web-browser, then to the external
-   * browser. Rebuilt per theme so switching themes restyles the chrome.
+   * Direct SIWS sign-in for the demo card — the exact flow the modal's
+   * useSiwsFlow runs (nonce → client.signIn → verify), driven from the
+   * demo's own UI instead of a connect: the sign-in request goes through
+   * the modal's preview (the user consents, the wallet signs), and
+   * verification is the REAL siws-verify package running on-device.
+   * Everything — signing and verification — stays in the demo app.
    */
-  const browser = useMemo(
-    () =>
-      createThemedBrowserSession(
-        { reborn: InAppBrowser, expo: ExpoWebBrowser },
-        { theme }
-      ),
-    [theme]
-  );
+  const siwsSignIn = useCallback(async (): Promise<SiwsSession | null> => {
+    if (!siwsEnabled || !client.session) return null;
+    setSiwsSigningIn(true);
+    try {
+      const nonce = await siwsConfig.nonce();
+      const result = await client.signIn({ statement: siwsConfig.statement, nonce });
+      return await siwsConfig.verify(
+        {
+          message: result.message,
+          signedMessage: result.signedMessage,
+          signerAddress: result.signerAddress,
+          signedData: result.signedData,
+        },
+        nonce
+      );
+    } finally {
+      setSiwsSigningIn(false);
+    }
+  }, [client, siwsConfig, siwsEnabled]);
 
-  // Pre-warm the system browser process (Chrome Custom Tabs / SFSafariVC)
-  // so the first themed open is instant — the browser analog of the
-  // WalletConnect warm-up. No-op when only the external fallback exists.
-  useEffect(() => {
-    void browser.warmup();
-  }, [browser]);
+  /**
+   * The in-app web browser — the WebView screen (URL-chip / Reload /
+   * Open-in-browser toolbar, the same chrome as the Albedo and xBull
+   * screens) that the modal uses for explorer/install/footer links. The
+   * Chrome-Custom-Tab surface was removed: it can't carry wallet
+   * protocols (no message channel back) and its native module doesn't
+   * exist in Expo Go, so the dependency bought nothing. The element
+   * renders at the app root via `browserView`, like albedoView/xbullView.
+   */
+  const browser = useMemo(() => createWebBrowser(setBrowserView), []);
 
   const value = useMemo(
     () => ({
@@ -348,6 +363,7 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       closeModal,
       albedoView,
       xbullView,
+      browserView,
       walletConnectConfigured: WC_PROJECT_ID.length > 0,
       theme,
       themeId,
@@ -358,9 +374,11 @@ export function AppKitProvider({ children }: { children: ReactNode }) {
       setAppLocale,
       siwsEnabled,
       setSiwsEnabled,
+      siwsSignIn,
+      siwsSigningIn,
       browser,
     }),
-    [client, modalOpen, openModal, closeModal, albedoView, xbullView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, browser]
+    [client, modalOpen, openModal, closeModal, albedoView, xbullView, browserView, theme, themeId, presentation, locale, setAppLocale, siwsEnabled, siwsSignIn, siwsSigningIn, browser]
   );
 
   return <AppKitDemoContext.Provider value={value}>{children}</AppKitDemoContext.Provider>;
